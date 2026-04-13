@@ -4,6 +4,8 @@
   "description": "Uga Burger Online Sipariş Sistemi",
   "scripts": {
     "start": "cd server && node server.js",
+    "build": "cd server && npm install",
+    "postinstall": "cd server && npm install",
     "server": "cd server && node server.js",
     "server:dev": "cd server && npx nodemon server.js",
     "client": "cd client && npm run dev",
