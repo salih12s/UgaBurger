@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
+import { getImageUrl } from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Button, Card, Stack, TextField, Chip, Checkbox, FormControlLabel,
@@ -131,7 +132,7 @@ export default function MenuManagement() {
                 {products.map(p => (
                   <TableRow key={p.id} hover>
                     <TableCell>
-                      {p.image_url ? <Box component="img" src={p.image_url} alt="" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover' }} /> : '🍔'}
+                      {p.image_url ? <Box component="img" src={getImageUrl(p.image_url)} alt="" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover' }} /> : '🍔'}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{p.name}</TableCell>
                     <TableCell>{p.category?.name}</TableCell>
@@ -218,7 +219,7 @@ export default function MenuManagement() {
             Resim Yükle
             <input type="file" accept="image/*" onChange={handleUpload} hidden />
           </Button>
-          {form.image_url && <Box component="img" src={form.image_url} alt="" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, ml: 1.5 }} />}
+          {form.image_url && <Box component="img" src={getImageUrl(form.image_url)} alt="" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, ml: 1.5 }} />}
           <Box sx={{ mt: 1.5, mb: 1 }}>
             <FormControlLabel control={<Switch name="is_available" checked={form.is_available} onChange={e => setForm(f => ({ ...f, is_available: e.target.checked }))} />} label="Aktif" />
           </Box>

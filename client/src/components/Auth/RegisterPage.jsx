@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Box, Card, Typography, TextField, Button, Divider, FormControlLabel, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
+import { API_URL } from '../../api/axios';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', password: '', password2: '' });
@@ -15,7 +16,7 @@ export default function RegisterPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(s => { if (s.kvkk_text) setKvkkText(s.kvkk_text); });
+    fetch(`${API_URL}/api/settings`).then(r => r.json()).then(s => { if (s.kvkk_text) setKvkkText(s.kvkk_text); });
   }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });

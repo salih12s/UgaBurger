@@ -8,7 +8,17 @@ const { sequelize } = require('./models');
 const app = express();
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
+const allowedOrigins = (process.env.CLIENT_URL || '*').split(',').map(s => s.trim());
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Geliştirme kolaylığı için tüm originlere izin ver
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

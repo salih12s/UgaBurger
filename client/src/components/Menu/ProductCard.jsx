@@ -1,10 +1,11 @@
 import { Card, CardMedia, CardContent, Typography, Button, Box } from '@mui/material';
+import { getImageUrl } from '../../api/axios';
 
 export default function ProductCard({ product, onClick, disabled }) {
   return (
     <Card onClick={disabled ? undefined : onClick} sx={{ cursor: disabled ? 'default' : 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', ...(disabled ? { filter: 'grayscale(100%)', opacity: 0.6 } : { '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' } }) }}>
       {product.image_url ? (
-        <CardMedia component="img" height="200" image={product.image_url} alt={product.name} sx={{ objectFit: 'cover' }} />
+        <CardMedia component="img" height="200" image={getImageUrl(product.image_url)} alt={product.name} sx={{ objectFit: 'cover' }} />
       ) : (
         <Box sx={{ height: 200, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🍔</Box>
       )}

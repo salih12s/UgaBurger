@@ -3,6 +3,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
+import { getImageUrl } from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   Dialog, DialogContent, Box, Typography, Button, IconButton, TextField, Stack,
@@ -183,7 +184,7 @@ export default function OrderDialog({ onClose, products }) {
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>✨ SİZİN İÇİN SEÇTİK</Typography>
                 {suggestions.map(p => (
                   <Stack key={p.id} direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.2, border: 1, borderColor: '#eee', borderRadius: 2.5, mb: 1 }}>
-                    {p.image_url ? <Box component="img" src={p.image_url} alt={p.name} sx={{ width: 40, height: 40, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🍔</Box>}
+                    {p.image_url ? <Box component="img" src={getImageUrl(p.image_url)} alt={p.name} sx={{ width: 40, height: 40, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🍔</Box>}
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>{p.name}</Typography>
                       <Typography variant="caption" color="text.secondary">{parseFloat(p.price).toFixed(2)} ₺</Typography>
@@ -200,7 +201,7 @@ export default function OrderDialog({ onClose, products }) {
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Sipariş Özeti</Typography>
             {items.map((item, idx) => (
               <Stack key={idx} direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid #f0f0f0' }}>
-                {item.product.image_url ? <Box component="img" src={item.product.image_url} alt={item.product.name} sx={{ width: 56, height: 56, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🍔</Box>}
+                {item.product.image_url ? <Box component="img" src={getImageUrl(item.product.image_url)} alt={item.product.name} sx={{ width: 56, height: 56, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🍔</Box>}
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.product.name}</Typography>
                   {item.selectedExtras.length > 0 && <Typography variant="caption" sx={{ color: '#8b5cf6' }}>+ {item.selectedExtras.map(e => e.name).join(', ')}</Typography>}

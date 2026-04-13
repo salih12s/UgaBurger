@@ -4,17 +4,18 @@ import { Box, Typography, Button, Stack } from '@mui/material';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import PlaceIcon from '@mui/icons-material/Place';
 import GoogleIcon from '@mui/icons-material/Google';
+import { API_URL, getImageUrl } from '../../api/axios';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState({});
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(s => setSettings(s)).catch(() => {});
+    fetch(`${API_URL}/api/settings`).then(r => r.json()).then(s => setSettings(s)).catch(() => {});
   }, []);
 
   const heroTitle = settings.hero_title || 'Taş Devrinden Gelen Lezzet';
-  const heroImage = settings.hero_image || '/images/smash_burger.jpg.jpeg';
+  const heroImage = getImageUrl(settings.hero_image || '/images/smash_burger.jpg.jpeg');
   const heroOverlay = parseInt(settings.hero_overlay || '60') / 100;
   const heroTextColor = settings.hero_text_color || '#fff';
   const textSizeMap = { small: { xs: 24, sm: 32, md: 38 }, medium: { xs: 30, sm: 40, md: 48 }, large: { xs: 36, sm: 48, md: 60 } };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
+import { getImageUrl } from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Card, TextField, Button, Chip, Stack, IconButton,
@@ -156,7 +157,7 @@ export default function TableOrders() {
             {filteredProducts.map(p => (
               <Card key={p.id} onClick={() => handleProductClick(p)} sx={{ p: 1.5, cursor: 'pointer', transition: 'transform 0.1s', '&:hover': { transform: 'scale(1.02)' } }}>
                 {p.image_url ? (
-                  <Box component="img" src={p.image_url} alt={p.name} sx={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 2, mb: 1 }} />
+                  <Box component="img" src={getImageUrl(p.image_url)} alt={p.name} sx={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 2, mb: 1 }} />
                 ) : (
                   <Box sx={{ width: '100%', height: 100, bgcolor: '#f0f0f0', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, mb: 1 }}>🍔</Box>
                 )}

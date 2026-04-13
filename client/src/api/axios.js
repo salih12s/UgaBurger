@@ -1,7 +1,17 @@
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+export { API_URL };
+
+export function getImageUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${API_URL}${path}`;
+}
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: `${API_URL}/api`,
   headers: { 'Content-Type': 'application/json' },
 });
 

@@ -7,6 +7,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
+import { getImageUrl } from '../../api/axios';
 
 export default function ProductModal({ product, onClose }) {
   const [quantity, setQuantity] = useState(1);
@@ -37,7 +38,7 @@ export default function ProductModal({ product, onClose }) {
       </IconButton>
 
       {product.image_url ? (
-        <Box component="img" src={product.image_url} alt={product.name} sx={{ width: '100%', height: 280, objectFit: 'cover' }} />
+        <Box component="img" src={getImageUrl(product.image_url)} alt={product.name} sx={{ width: '100%', height: 280, objectFit: 'cover' }} />
       ) : (
         <Box sx={{ width: '100%', height: 280, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 64 }}>🍔</Box>
       )}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
+import { getImageUrl } from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Card, TextField, Button, Switch, Stack, Checkbox, Avatar, Slider,
@@ -390,7 +391,7 @@ export default function SettingsPanel() {
               sx={{ p: 1, borderRadius: 2, cursor: 'pointer', mb: 0.5, '&:hover': { bgcolor: '#f5f5f5' },
                 ...(selectedProducts.includes(p.id) && { bgcolor: '#fef2f2', border: '1px solid #fca5a5' }) }}>
               <Checkbox checked={selectedProducts.includes(p.id)} size="small" sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
-              {p.image_url ? <Avatar src={p.image_url} variant="rounded" sx={{ width: 32, height: 32 }} /> : <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: '#f0f0f0', fontSize: 14 }}>🍔</Avatar>}
+              {p.image_url ? <Avatar src={getImageUrl(p.image_url)} variant="rounded" sx={{ width: 32, height: 32 }} /> : <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: '#f0f0f0', fontSize: 14 }}>🍔</Avatar>}
               <Box sx={{ flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 600 }}>{p.name}</Typography></Box>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{parseFloat(p.price).toFixed(2)} ₺</Typography>
             </Stack>

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
+import { API_URL } from '../../api/axios';
 
 export default function Footer() {
   const [siteName, setSiteName] = useState('Uga Burger');
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(s => { if (s.site_name) setSiteName(s.site_name); }).catch(() => {});
+    fetch(`${API_URL}/api/settings`).then(r => r.json()).then(s => { if (s.site_name) setSiteName(s.site_name); }).catch(() => {});
   }, []);
 
   return (
