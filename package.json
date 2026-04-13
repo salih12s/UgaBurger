@@ -1,0 +1,16 @@
+{
+  "name": "ugaburger",
+  "version": "1.0.0",
+  "description": "Uga Burger Online Sipariş Sistemi",
+  "scripts": {
+    "server": "cd server && node server.js",
+    "server:dev": "cd server && npx nodemon server.js",
+    "client": "cd client && npm run dev",
+    "dev": "npx concurrently \"npm run server:dev\" \"npm run client\"",
+    "seed": "cd server && node seeds/seed.js",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

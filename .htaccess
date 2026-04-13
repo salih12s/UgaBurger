@@ -1,0 +1,18 @@
+RewriteEngine On
+
+# API isteklerini Node.js backend'e yönlendir (Plesk proxy üzerinden)
+RewriteCond %{REQUEST_URI} ^/api [NC]
+RewriteRule ^api/(.*)$ http://localhost:3000/api/$1 [P,L]
+
+# Upload dosyalarını backend'e yönlendir
+RewriteCond %{REQUEST_URI} ^/uploads [NC]
+RewriteRule ^uploads/(.*)$ http://localhost:3000/uploads/$1 [P,L]
+
+# Images dosyalarını backend'e yönlendir
+RewriteCond %{REQUEST_URI} ^/images [NC]
+RewriteRule ^images/(.*)$ http://localhost:3000/images/$1 [P,L]
+
+# React SPA - Dosya yoksa index.html'e yönlendir
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
