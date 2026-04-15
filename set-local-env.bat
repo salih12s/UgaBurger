@@ -14,13 +14,6 @@ echo DB_USER=postgres
 echo DB_PASSWORD=12345
 echo DB_SSL=false
 echo.
-echo # Database Configuration - Production ^(Plesk MariaDB^)
-echo # DB_HOST=localhost
-echo # DB_PORT=3306
-echo # DB_NAME=UgaBurger
-echo # DB_USER=ugaburger
-echo # DB_PASSWORD=ugaburger33
-echo.
 echo # JWT Configuration
 echo JWT_SECRET=ugaburger_super_secret_key_2024_x7k9m2
 echo.

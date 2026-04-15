@@ -4,7 +4,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 let sequelize;
 
 if (process.env.DATABASE_URL) {
-  // Railway / Production
+  // Production (Railway)
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     logging: false,
@@ -20,7 +20,7 @@ if (process.env.DATABASE_URL) {
     },
   });
 } else {
-  // Local
+  // Local Development
   sequelize = new Sequelize(
     process.env.DB_NAME,
     process.env.DB_USER,
