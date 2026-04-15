@@ -1,19 +1,54 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
-import { API_URL } from '../../api/axios';
+import { Box, Typography, Stack, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
+import api from '../../api/api';
 
 export default function Footer() {
   const [siteName, setSiteName] = useState('Uga Burger');
+  const [settings, setSettings] = useState({});
+  const [legalDialog, setLegalDialog] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/settings`).then(r => r.json()).then(s => { if (s.site_name) setSiteName(s.site_name); }).catch(() => {});
+    api.get('/settings').then(r => {
+      setSettings(r.data);
+      if (r.data.site_name) setSiteName(r.data.site_name);
+    }).catch(() => {});
   }, []);
 
+  const legalItems = [
+    { key: 'kvkk_text', label: 'KVKK Aydınlatma Metni' },
+    { key: 'privacy_text', label: 'Gizlilik Politikası' },
+    { key: 'sales_agreement', label: 'Mesafeli Satış Sözleşmesi' },
+  ];
+
   return (
-    <Box component="footer" sx={{ textAlign: 'center', py: 2.5, color: '#888', fontSize: 13, bgcolor: '#fff', borderTop: '1px solid #eee', mt: 5 }}>
-      <Typography variant="body2" color="text.secondary">
-        © {new Date().getFullYear()} {siteName} - Tüm hakları saklıdır.
-      </Typography>
-    </Box>
+    <>
+      <Box component="footer" sx={{ textAlign: 'center', py: 2.5, color: '#888', fontSize: 13, bgcolor: '#fff', borderTop: '1px solid #eee', mt: 5 }}>
+        <Typography variant="body2" color="text.secondary">
+          © {new Date().getFullYear()} {siteName} - Tüm hakları saklıdır.
+        </Typography>
+        <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 1 }}>
+          {legalItems.map(item => (
+            settings[item.key] && (
+              <Typography key={item.key} variant="caption" onClick={() => setLegalDialog(item)}
+                sx={{ cursor: 'pointer', color: '#3b82f6', '&:hover': { textDecoration: 'underline' } }}>
+                {item.label}
+              </Typography>
+            )
+          ))}
+        </Stack>
+      </Box>
+
+      <Dialog open={!!legalDialog} onClose={() => setLegalDialog(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>{legalDialog?.label}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line', mt: 1 }}>
+            {legalDialog ? settings[legalDialog.key] : ''}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLegalDialog(null)} variant="contained" sx={{ fontWeight: 600 }}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

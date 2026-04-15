@@ -4,14 +4,14 @@ import { Box, Typography, Button, Stack } from '@mui/material';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import PlaceIcon from '@mui/icons-material/Place';
 import GoogleIcon from '@mui/icons-material/Google';
-import { API_URL, getImageUrl } from '../../api/axios';
+import api, { getImageUrl } from '../../api/api';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState({});
 
   useEffect(() => {
-    fetch(`${API_URL}/api/settings`).then(r => r.json()).then(s => setSettings(s)).catch(() => {});
+    api.get('/settings').then(r => setSettings(r.data)).catch(() => {});
   }, []);
 
   const heroTitle = settings.hero_title || 'Taş Devrinden Gelen Lezzet';

@@ -1,5 +1,5 @@
 import { Card, CardMedia, CardContent, Typography, Button, Box } from '@mui/material';
-import { getImageUrl } from '../../api/axios';
+import { getImageUrl } from '../../api/api';
 
 export default function ProductCard({ product, onClick, disabled }) {
   return (

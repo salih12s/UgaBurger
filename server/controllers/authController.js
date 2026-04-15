@@ -27,7 +27,7 @@ const register = async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role },
+      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role, addresses: [] },
     });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
@@ -58,9 +58,11 @@ const login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    let addrs = [];
+    try { addrs = JSON.parse(user.addresses || '[]'); } catch {}
     res.json({
       token,
-      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role },
+      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role, addresses: addrs },
     });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
@@ -70,13 +72,30 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role'],
+      attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'addresses'],
     });
     if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
-    res.json(user);
+    const u = user.toJSON();
+    try { u.addresses = JSON.parse(u.addresses || '[]'); } catch { u.addresses = []; }
+    res.json(u);
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası' });
   }
 };
 
-module.exports = { register, login, getMe };
+const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    const { addresses } = req.body;
+    if (addresses !== undefined) user.addresses = JSON.stringify(addresses);
+    await user.save();
+    const u = user.toJSON();
+    try { u.addresses = JSON.parse(u.addresses || '[]'); } catch { u.addresses = []; }
+    res.json({ id: u.id, first_name: u.first_name, last_name: u.last_name, email: u.email, phone: u.phone, role: u.role, addresses: u.addresses });
+  } catch (err) {
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+};
+
+module.exports = { register, login, getMe, updateProfile };

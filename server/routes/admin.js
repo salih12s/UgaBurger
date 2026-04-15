@@ -26,6 +26,7 @@ router.delete('/products/:id', ctrl.deleteProduct);
 // Categories
 router.post('/categories', ctrl.createCategory);
 router.put('/categories/:id', ctrl.updateCategory);
+router.delete('/categories/:id', ctrl.deleteCategory);
 
 // Extras
 router.get('/extras', ctrl.getExtras);

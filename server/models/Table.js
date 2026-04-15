@@ -4,6 +4,7 @@ const sequelize = require('../config/db');
 const Table = sequelize.define('Table', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   table_number: { type: DataTypes.INTEGER, allowNull: false, unique: true },
+  table_name: { type: DataTypes.STRING(100), allowNull: true, defaultValue: null },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
 }, { tableName: 'tables' });
 

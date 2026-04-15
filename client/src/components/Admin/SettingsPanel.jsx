@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../../api/axios';
-import { getImageUrl } from '../../api/axios';
+import api, { getImageUrl } from '../../api/api';
 import toast from 'react-hot-toast';
 import {
-  Box, Typography, Card, TextField, Button, Switch, Stack, Checkbox, Avatar, Slider,
+  Box, Typography, Card, TextField, Button, Switch, Stack, Checkbox, Slider,
   Accordion, AccordionSummary, AccordionDetails, Select, MenuItem, FormControlLabel, Fab
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -24,8 +23,6 @@ const Section = ({ icon, title, children, defaultExpanded }) => (
 export default function SettingsPanel() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]);
   const [mapCenter, setMapCenter] = useState({ lat: 36.8, lng: 34.63 });
   const [zones, setZones] = useState([]);
   const mapRef = useRef(null);
@@ -34,10 +31,6 @@ export default function SettingsPanel() {
   const zonesRef = useRef([]);
 
   useEffect(() => { api.get('/admin/settings').then(res => setSettings(res.data)); }, []);
-  useEffect(() => { api.get('/admin/products').then(res => setProducts(res.data)); }, []);
-  useEffect(() => {
-    if (settings.recommended_products) setSelectedProducts(settings.recommended_products.split(',').map(Number).filter(Boolean));
-  }, [settings.recommended_products]);
   useEffect(() => {
     if (settings.delivery_zones) {
       try { setZones(JSON.parse(settings.delivery_zones)); } catch { setZones([]); }
@@ -46,8 +39,6 @@ export default function SettingsPanel() {
 
   const s = (key, def = '') => settings[key] || def;
   const upd = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
-
-  const toggleRecommended = (id) => setSelectedProducts(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const saveAll = async () => {
     setLoading(true);
@@ -77,7 +68,6 @@ export default function SettingsPanel() {
       ['kvkk_text', s('kvkk_text')],
       ['privacy_text', s('privacy_text')],
       ['sales_agreement', s('sales_agreement')],
-      ['recommended_products', selectedProducts.join(',')],
       ['delivery_zones', JSON.stringify(zones)],
     ];
     DAYS.forEach((d, i) => {
@@ -381,25 +371,7 @@ export default function SettingsPanel() {
         </Stack>
       </Section>
 
-      {/* 9. Önerilen Ürünler */}
-      <Section icon="⭐" title="Sizin İçin Seçtiklerimiz">
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Sipariş ekranında önerilecek ürünleri seçin</Typography>
-        <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
-          {products.map(p => (
-            <Stack key={p.id} direction="row" alignItems="center" spacing={1.5}
-              onClick={() => toggleRecommended(p.id)}
-              sx={{ p: 1, borderRadius: 2, cursor: 'pointer', mb: 0.5, '&:hover': { bgcolor: '#f5f5f5' },
-                ...(selectedProducts.includes(p.id) && { bgcolor: '#fef2f2', border: '1px solid #fca5a5' }) }}>
-              <Checkbox checked={selectedProducts.includes(p.id)} size="small" sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
-              {p.image_url ? <Avatar src={getImageUrl(p.image_url)} variant="rounded" sx={{ width: 32, height: 32 }} /> : <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: '#f0f0f0', fontSize: 14 }}>🍔</Avatar>}
-              <Box sx={{ flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 600 }}>{p.name}</Typography></Box>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{parseFloat(p.price).toFixed(2)} ₺</Typography>
-            </Stack>
-          ))}
-        </Box>
-      </Section>
-
-      {/* 10. KVKK & Hukuki Metinler */}
+      {/* 9. KVKK & Hukuki Metinler */}
       <Section icon="📜" title="KVKK &amp; Hukuki Metinler">
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Kayıt ve ödeme sırasında kullanıcılara gösterilecek yasal metinler.</Typography>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>✅ KVKK AYDINLATMA METNİ</Typography>

@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../api/axios';
+import api from '../../api/api';
 import {
-  Box, Typography, Card, Stack, Chip, Divider, CircularProgress, Avatar, TextField, Button
+  Box, Typography, Card, Stack, Chip, Divider, CircularProgress, Avatar, TextField, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import HomeIcon from '@mui/icons-material/Home';
+import WorkIcon from '@mui/icons-material/Work';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import toast from 'react-hot-toast';
 
 const statusLabels = {
@@ -16,26 +22,57 @@ const statusColors = {
   ready: '#16a34a', delivered: '#64748b', cancelled: '#dc2626',
 };
 
+const addressIcons = { 'Ev': <HomeIcon fontSize="small" />, 'İş': <WorkIcon fontSize="small" /> };
+
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [address, setAddress] = useState('');
+  const [addresses, setAddresses] = useState([]);
+  const [addrDialog, setAddrDialog] = useState(false);
+  const [editIdx, setEditIdx] = useState(-1);
+  const [addrTitle, setAddrTitle] = useState('');
+  const [addrText, setAddrText] = useState('');
 
   useEffect(() => {
     api.get('/orders/my').then(res => { setOrders(res.data); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (user) {
-      const saved = localStorage.getItem(`address_${user.id}`);
-      if (saved) setAddress(saved);
+    if (user?.addresses && Array.isArray(user.addresses)) {
+      setAddresses(user.addresses);
     }
   }, [user]);
 
-  const saveAddress = () => {
-    localStorage.setItem(`address_${user.id}`, address);
-    toast.success('Adres kaydedildi');
+  const saveAddresses = async (newList) => {
+    try {
+      await api.put('/auth/profile', { addresses: newList });
+      setAddresses(newList);
+      if (refreshUser) refreshUser();
+      toast.success('Adresler güncellendi');
+    } catch {
+      toast.error('Adres kaydedilemedi');
+    }
+  };
+
+  const openAddDialog = () => { setEditIdx(-1); setAddrTitle(''); setAddrText(''); setAddrDialog(true); };
+  const openEditDialog = (idx) => { setEditIdx(idx); setAddrTitle(addresses[idx].title); setAddrText(addresses[idx].address); setAddrDialog(true); };
+
+  const handleSaveAddr = () => {
+    if (!addrTitle.trim() || !addrText.trim()) { toast.error('Başlık ve adres giriniz'); return; }
+    const newList = [...addresses];
+    if (editIdx >= 0) {
+      newList[editIdx] = { title: addrTitle.trim(), address: addrText.trim() };
+    } else {
+      newList.push({ title: addrTitle.trim(), address: addrText.trim() });
+    }
+    saveAddresses(newList);
+    setAddrDialog(false);
+  };
+
+  const handleDeleteAddr = (idx) => {
+    const newList = addresses.filter((_, i) => i !== idx);
+    saveAddresses(newList);
   };
 
   const formatDate = (d) => new Date(d).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -66,14 +103,58 @@ export default function ProfilePage() {
             <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.phone}</Typography>
           </Box>
         </Box>
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="caption" color="text.secondary">Kayıtlı Adres</Typography>
-          <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-            <TextField fullWidth size="small" placeholder="Teslimat adresinizi kaydedin..." value={address} onChange={e => setAddress(e.target.value)} />
-            <Button variant="contained" size="small" onClick={saveAddress} sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Kaydet</Button>
+
+        {/* Multi-address management */}
+        <Box sx={{ mt: 2.5 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Kayıtlı Adreslerim</Typography>
+            <Button size="small" startIcon={<AddIcon />} onClick={openAddDialog} sx={{ fontWeight: 600, textTransform: 'none' }}>Yeni Adres</Button>
           </Stack>
+          {addresses.length === 0 ? (
+            <Box sx={{ p: 2.5, border: '2px dashed #e5e7eb', borderRadius: 2, textAlign: 'center', cursor: 'pointer' }} onClick={openAddDialog}>
+              <LocationOnIcon sx={{ fontSize: 32, color: '#9ca3af', mb: 0.5 }} />
+              <Typography variant="body2" color="text.secondary">Henüz kayıtlı adresiniz yok</Typography>
+              <Typography variant="caption" color="primary">+ Adres Ekle</Typography>
+            </Box>
+          ) : (
+            addresses.map((a, i) => (
+              <Box key={i} sx={{ border: 1, borderColor: '#e5e7eb', borderRadius: 2, p: 1.5, mb: 1, '&:hover': { borderColor: '#3b82f6', bgcolor: '#f8fafc' } }}>
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Avatar sx={{ width: 36, height: 36, bgcolor: '#eff6ff', color: '#3b82f6' }}>
+                    {addressIcons[a.title] || <LocationOnIcon fontSize="small" />}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{a.title}</Typography>
+                    <Typography variant="caption" color="text.secondary">{a.address}</Typography>
+                  </Box>
+                  <IconButton size="small" onClick={() => openEditDialog(i)} sx={{ color: '#3b82f6' }}><EditIcon fontSize="small" /></IconButton>
+                  <IconButton size="small" onClick={() => handleDeleteAddr(i)} sx={{ color: '#dc2626' }}><DeleteIcon fontSize="small" /></IconButton>
+                </Stack>
+              </Box>
+            ))
+          )}
         </Box>
       </Card>
+
+      {/* Address Add/Edit Dialog */}
+      <Dialog open={addrDialog} onClose={() => setAddrDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>{editIdx >= 0 ? 'Adresi Düzenle' : 'Yeni Adres Ekle'}</DialogTitle>
+        <DialogContent>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Adres Başlığı</Typography>
+          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            {['Ev', 'İş', 'Diğer'].map(t => (
+              <Chip key={t} label={t} variant={addrTitle === t ? 'filled' : 'outlined'} onClick={() => setAddrTitle(t)}
+                sx={{ fontWeight: 600, ...(addrTitle === t ? { bgcolor: '#3b82f6', color: '#fff' } : {}) }} />
+            ))}
+          </Stack>
+          <TextField fullWidth size="small" label="Başlık" value={addrTitle} onChange={e => setAddrTitle(e.target.value)} sx={{ mb: 2 }} />
+          <TextField fullWidth size="small" label="Adres" multiline rows={2} value={addrText} onChange={e => setAddrText(e.target.value)} placeholder="Mahalle, sokak, bina no, daire..." />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAddrDialog(false)}>İptal</Button>
+          <Button variant="contained" onClick={handleSaveAddr} sx={{ fontWeight: 600 }}>Kaydet</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Order History */}
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Geçmiş Siparişlerim</Typography>

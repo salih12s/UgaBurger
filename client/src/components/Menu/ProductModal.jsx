@@ -7,7 +7,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import { getImageUrl } from '../../api/axios';
+import { getImageUrl } from '../../api/api';
 
 export default function ProductModal({ product, onClose }) {
   const [quantity, setQuantity] = useState(1);

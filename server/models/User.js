@@ -9,6 +9,7 @@ const User = sequelize.define('User', {
   phone: { type: DataTypes.STRING(20), allowNull: false, unique: true },
   password_hash: { type: DataTypes.STRING(255), allowNull: false },
   role: { type: DataTypes.ENUM('customer', 'admin'), defaultValue: 'customer' },
+  addresses: { type: DataTypes.TEXT, allowNull: true, defaultValue: '[]' },
 }, { tableName: 'users' });
 
 module.exports = User;

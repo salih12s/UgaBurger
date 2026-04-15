@@ -15,7 +15,7 @@ const getAllOrders = async (req, res) => {
       where,
       include: [
         { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'phone'] },
-        { model: Table, as: 'table', attributes: ['id', 'table_number'] },
+        { model: Table, as: 'table', attributes: ['id', 'table_number', 'table_name'] },
         { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'image_url'] }] },
       ],
       order: [['created_at', 'DESC']],
@@ -53,7 +53,7 @@ const updateOrderStatus = async (req, res) => {
 const createQuickOrder = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { items, table_id, order_note, payment_method } = req.body;
+    const { items, table_id, order_note, payment_method, customer_name, customer_phone, delivery_address } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Ürün seçiniz' });
@@ -70,7 +70,7 @@ const createQuickOrder = async (req, res) => {
       let itemTotal = unitPrice * item.quantity;
       const extras = item.extras || [];
       if (unitPrice > 0) {
-        for (const extra of extras) { itemTotal += parseFloat(extra.price) * item.quantity; }
+        for (const extra of extras) { itemTotal += parseFloat(extra.price) * (extra.quantity || 1) * item.quantity; }
       }
 
       total_amount += itemTotal;
@@ -81,11 +81,14 @@ const createQuickOrder = async (req, res) => {
       user_id: null,
       order_type: 'table',
       table_id: table_id || null,
+      delivery_address: delivery_address || null,
       total_amount,
       order_note: order_note || '',
       status: 'preparing',
       payment_status: payment_method === 'card' ? 'paid' : 'pending',
       payment_method: payment_method === 'card' ? 'online' : 'door',
+      customer_name: customer_name || null,
+      customer_phone: customer_phone || null,
     }, { transaction: t });
 
     for (const itemData of orderItemsData) {
@@ -118,7 +121,7 @@ const getTables = async (req, res) => {
 
 const createTable = async (req, res) => {
   try {
-    const table = await Table.create({ table_number: req.body.table_number });
+    const table = await Table.create({ table_number: req.body.table_number, table_name: req.body.table_name || null });
     res.status(201).json(table);
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
 };
@@ -214,6 +217,17 @@ const updateCategory = async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
 };
 
+const deleteCategory = async (req, res) => {
+  try {
+    const cat = await Category.findByPk(req.params.id);
+    if (!cat) return res.status(404).json({ error: 'Kategori bulunamadı' });
+    const productCount = await Product.count({ where: { category_id: cat.id } });
+    if (productCount > 0) return res.status(400).json({ error: `Bu kategoride ${productCount} ürün var. Önce ürünleri silin veya başka kategoriye taşıyın.` });
+    await cat.destroy();
+    res.json({ message: 'Kategori silindi' });
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
+};
+
 // --- EXTRA MANAGEMENT ---
 const getExtras = async (req, res) => {
   try {
@@ -285,7 +299,7 @@ const getDailyReport = async (req, res) => {
       include: [
         { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name'] }] },
         { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'phone'] },
-        { model: Table, as: 'table', attributes: ['id', 'table_number'] },
+        { model: Table, as: 'table', attributes: ['id', 'table_number', 'table_name'] },
       ],
       order: [['created_at', 'DESC']],
     });
@@ -321,6 +335,8 @@ const getDailyReport = async (req, res) => {
       user: o.user,
       table: o.table,
       delivery_address: o.delivery_address,
+      customer_name: o.customer_name,
+      customer_phone: o.customer_phone,
       items: o.items.map(it => ({
         name: it.product?.name || 'Bilinmeyen',
         quantity: it.quantity,
@@ -369,7 +385,7 @@ module.exports = {
   getAllOrders, updateOrderStatus, createQuickOrder,
   getTables, createTable, updateTable, deleteTable,
   getAllProductsAdmin, createProduct, updateProduct, deleteProduct,
-  createCategory, updateCategory,
+  createCategory, updateCategory, deleteCategory,
   getExtras, createExtra, updateExtra, deleteExtra,
   upload, uploadImage,
   getDailyReport,

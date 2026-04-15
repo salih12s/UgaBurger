@@ -4,19 +4,25 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Box, Card, Typography, TextField, Button, Divider, FormControlLabel, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
-import { API_URL } from '../../api/axios';
+import api from '../../api/api';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', password: '', password2: '' });
   const [loading, setLoading] = useState(false);
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [kvkkDialog, setKvkkDialog] = useState(false);
-  const [kvkkText, setKvkkText] = useState('');
+  const [privacyDialog, setPrivacyDialog] = useState(false);
+  const [salesDialog, setSalesDialog] = useState(false);
+  const [legalTexts, setLegalTexts] = useState({});
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  const defaultKvkk = `Veri Sorumlusu:\nAhment Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin\nE-posta: bilgi@ugaburger.com\n\nKişisel verileriniz; sipariş süreçlerinin yürütülmesi, iletişim faaliyetlerinin sağlanması ve hukuki yükümlülüklerin yerine getirilmesi amacıyla 6698 sayılı KVKK kapsamında işlenmektedir.\n\nToplanan kişisel veriler: Ad, Soyad, Telefon, E-posta, Adres bilgileri.\n\nVerileriniz yasal zorunluluklar dışında üçüncü kişilerle paylaşılmamaktadır. KVKK'nın 11. maddesi gereğince bilgi edinme, düzeltme ve silme haklarınız saklıdır.`;
+  const defaultPrivacy = `Uga Burger olarak kişisel verilerinizin güvenliğini önemsiyoruz.\n\nToplanan bilgiler yalnızca sipariş süreçleri ve müşteri iletişimi amacıyla kullanılır. Kredi kartı bilgileriniz sunucularımızda saklanmaz.\n\nÇerez Politikası: Sitemiz, kullanıcı deneyimini iyileştirmek için çerezler kullanmaktadır.\n\nBilgileriniz üçüncü taraflarla paylaşılmaz ve yasal gereklilikler dışında kullanılmaz.`;
+  const defaultSales = `SATICI BİLGİLERİ\nSatıcı: Ahment Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin\n\nSipariş onaylandıktan sonra hazırlanmaya başlanır. Hazırlığa başlanmış siparişler iptal edilemez.\n\nTeslimat süresi bölgeye ve yoğunluğa göre değişiklik gösterebilir.\n\nÖdeme, sipariş onayı sonrasında tahsil edilir. İade ve cayma hakkı, tüketici mevzuatı çerçevesinde uygulanır.`;
+
   useEffect(() => {
-    fetch(`${API_URL}/api/settings`).then(r => r.json()).then(s => { if (s.kvkk_text) setKvkkText(s.kvkk_text); });
+    api.get('/settings').then(r => setLegalTexts(r.data)).catch(() => {});
   }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -53,7 +59,13 @@ export default function RegisterPage() {
           <TextField fullWidth label="Şifre Tekrar" name="password2" type="password" value={form.password2} onChange={handleChange} sx={{ mb: 2 }} size="medium" />
           <FormControlLabel
             control={<Checkbox checked={kvkkAccepted} onChange={e => setKvkkAccepted(e.target.checked)} sx={{ '&.Mui-checked': { color: '#dc2626' } }} />}
-            label={<Typography variant="body2"><Typography component="span" onClick={e => { e.preventDefault(); setKvkkDialog(true); }} sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>KVKK Aydınlatma Metni</Typography>'ni okudum, kabul ediyorum.</Typography>}
+            label={
+              <Typography variant="body2">
+                <Typography component="span" onClick={e => { e.preventDefault(); setKvkkDialog(true); }} sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>KVKK Aydınlatma Metni</Typography>,{' '}
+                <Typography component="span" onClick={e => { e.preventDefault(); setPrivacyDialog(true); }} sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>Gizlilik Politikası</Typography> ve{' '}
+                <Typography component="span" onClick={e => { e.preventDefault(); setSalesDialog(true); }} sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>Mesafeli Satış Sözleşmesi</Typography>'ni okudum, kabul ediyorum.
+              </Typography>
+            }
             sx={{ mb: 2, alignItems: 'flex-start' }}
           />
           <Button fullWidth type="submit" variant="contained" color="primary" disabled={loading || !kvkkAccepted}
@@ -76,11 +88,35 @@ export default function RegisterPage() {
         <DialogTitle sx={{ fontWeight: 700 }}>KVKK Aydınlatma Metni</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-            {kvkkText || 'KVKK Aydınlatma Metni yükleniyor...'}
+            {legalTexts.kvkk_text || defaultKvkk}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setKvkkAccepted(true); setKvkkDialog(false); }} variant="contained" sx={{ fontWeight: 600 }}>Okudum, Kabul Ediyorum</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={privacyDialog} onClose={() => setPrivacyDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Gizlilik Politikası</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+            {legalTexts.privacy_text || defaultPrivacy}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPrivacyDialog(false)} variant="contained" sx={{ fontWeight: 600 }}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={salesDialog} onClose={() => setSalesDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Mesafeli Satış Sözleşmesi</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+            {legalTexts.sales_agreement || defaultSales}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSalesDialog(false)} variant="contained" sx={{ fontWeight: 600 }}>Kapat</Button>
         </DialogActions>
       </Dialog>
     </Box>

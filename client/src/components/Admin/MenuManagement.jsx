@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import api from '../../api/axios';
-import { getImageUrl } from '../../api/axios';
+import api, { getImageUrl } from '../../api/api';
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Button, Card, Stack, TextField, Chip, Checkbox, FormControlLabel,
   Table, TableHead, TableBody, TableRow, TableCell, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  FormControl, InputLabel, Select, MenuItem, Switch
+  FormControl, InputLabel, Select, MenuItem, Switch, Avatar
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -24,6 +23,8 @@ export default function MenuManagement() {
   const [extraForm, setExtraForm] = useState({ name: '', price: '' });
   const [editingExtra, setEditingExtra] = useState(null);
   const [catForm, setCatForm] = useState({ name: '', slug: '', sort_order: 0 });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState([]);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -31,6 +32,19 @@ export default function MenuManagement() {
     api.get('/admin/products').then(res => setProducts(res.data));
     api.get('/categories').then(res => setCategories(res.data));
     api.get('/admin/extras').then(res => setExtras(res.data));
+    api.get('/admin/settings').then(res => {
+      const rec = res.data.recommended_products;
+      if (rec) setSelectedProducts(rec.split(',').map(Number).filter(Boolean));
+    });
+  };
+
+  const toggleRecommended = (id) => setSelectedProducts(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+  const saveRecommended = async () => {
+    try {
+      await api.put('/admin/settings', { key: 'recommended_products', value: selectedProducts.join(',') });
+      toast.success('Önerilen ürünler kaydedildi!');
+    } catch { toast.error('Kaydetme hatası'); }
   };
 
   const handleChange = (e) => {
@@ -44,13 +58,13 @@ export default function MenuManagement() {
 
   const openEdit = (product) => {
     setEditing(product.id);
-    setForm({ name: product.name, description: product.description || '', price: product.price, category_id: product.category_id, image_url: product.image_url || '', is_available: product.is_available, extra_ids: product.extras ? product.extras.map(e => e.id) : [] });
+    setForm({ name: product.name, description: product.description || '', price: product.price, category_id: product.category_id, image_url: product.image_url || '', is_available: product.is_available, is_suggested: product.is_suggested || false, extra_ids: product.extras ? product.extras.map(e => e.id) : [] });
     setShowForm(true);
   };
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', price: '', category_id: categories[0]?.id || '', image_url: '', is_available: true, extra_ids: [] });
+    setForm({ name: '', description: '', price: '', category_id: categories[0]?.id || '', image_url: '', is_available: true, is_suggested: false, extra_ids: [] });
     setShowForm(true);
   };
 
@@ -65,8 +79,24 @@ export default function MenuManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Bu ürünü silmek istediğinize emin misiniz?')) return;
     try { await api.delete(`/admin/products/${id}`); toast.success('Ürün silindi'); fetchAll(); } catch { toast.error('Hata'); }
+  };
+
+  const handleCatDelete = async (id) => {
+    try { await api.delete(`/admin/categories/${id}`); toast.success('Kategori silindi'); fetchAll(); } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
+  };
+
+  const handleExtraDelete = async (id) => {
+    try { await api.delete(`/admin/extras/${id}`); toast.success('Ekstra silindi'); fetchAll(); } catch { toast.error('Hata'); }
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    const { type, id } = deleteConfirm;
+    if (type === 'product') handleDelete(id);
+    else if (type === 'category') handleCatDelete(id);
+    else if (type === 'extra') handleExtraDelete(id);
+    setDeleteConfirm(null);
   };
 
   const handleUpload = async (e) => {
@@ -85,10 +115,6 @@ export default function MenuManagement() {
       else { await api.post('/admin/extras', { name: extraForm.name, price: parseFloat(extraForm.price) }); toast.success('Ekstra eklendi'); }
       setExtraForm({ name: '', price: '' }); setEditingExtra(null); fetchAll();
     } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
-  };
-
-  const handleExtraDelete = async (id) => {
-    try { await api.delete(`/admin/extras/${id}`); toast.success('Ekstra silindi'); fetchAll(); } catch { toast.error('Hata'); }
   };
 
   const handleCatSubmit = async () => {
@@ -110,6 +136,8 @@ export default function MenuManagement() {
             sx={{ fontWeight: 600, ...(tab === 'extras' && { bgcolor: '#dc2626', color: '#fff' }) }} />
           <Chip label="Kategoriler" onClick={() => setTab('categories')} variant={tab === 'categories' ? 'filled' : 'outlined'}
             sx={{ fontWeight: 600, ...(tab === 'categories' && { bgcolor: '#dc2626', color: '#fff' }) }} />
+          <Chip label="Önerilen" onClick={() => setTab('recommended')} variant={tab === 'recommended' ? 'filled' : 'outlined'}
+            sx={{ fontWeight: 600, ...(tab === 'recommended' && { bgcolor: '#dc2626', color: '#fff' }) }} />
         </Stack>
       </Stack>
 
@@ -144,7 +172,7 @@ export default function MenuManagement() {
                     <TableCell>
                       <Stack direction="row" spacing={0.5}>
                         <IconButton size="small" color="primary" onClick={() => openEdit(p)}><EditIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDelete(p.id)}><DeleteIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" color="error" onClick={() => setDeleteConfirm({ type: 'product', id: p.id, name: p.name })}><DeleteIcon fontSize="small" /></IconButton>
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -172,7 +200,7 @@ export default function MenuManagement() {
                   <TableCell>
                     <Stack direction="row" spacing={0.5}>
                       <IconButton size="small" color="primary" onClick={() => { setEditingExtra(e.id); setExtraForm({ name: e.name, price: e.price }); }}><EditIcon fontSize="small" /></IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleExtraDelete(e.id)}><DeleteIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => setDeleteConfirm({ type: 'extra', id: e.id, name: e.name })}><DeleteIcon fontSize="small" /></IconButton>
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -191,13 +219,40 @@ export default function MenuManagement() {
             <Button variant="contained" color="success" onClick={handleCatSubmit} sx={{ fontWeight: 600 }}>Ekle</Button>
           </Stack>
           <Table>
-            <TableHead><TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8' } }}><TableCell>İsim</TableCell><TableCell>Slug</TableCell><TableCell>Sıra</TableCell></TableRow></TableHead>
+            <TableHead><TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8' } }}><TableCell>İsim</TableCell><TableCell>Slug</TableCell><TableCell>Sıra</TableCell><TableCell>İşlem</TableCell></TableRow></TableHead>
             <TableBody>
               {categories.map(c => (
-                <TableRow key={c.id} hover><TableCell>{c.name}</TableCell><TableCell>{c.slug}</TableCell><TableCell>{c.sort_order}</TableCell></TableRow>
+                <TableRow key={c.id} hover>
+                  <TableCell>{c.name}</TableCell>
+                  <TableCell>{c.slug}</TableCell>
+                  <TableCell>{c.sort_order}</TableCell>
+                  <TableCell>
+                    <IconButton size="small" color="error" onClick={() => setDeleteConfirm({ type: 'category', id: c.id, name: c.name })}><DeleteIcon fontSize="small" /></IconButton>
+                  </TableCell>
+                </TableRow>
               ))}
             </TableBody>
           </Table>
+        </Card>
+      )}
+
+      {tab === 'recommended' && (
+        <Card sx={{ p: 2.5 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Sipariş ekranında önerilecek ürünleri seçin</Typography>
+          <Box sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
+            {products.map(p => (
+              <Stack key={p.id} direction="row" alignItems="center" spacing={1.5}
+                onClick={() => toggleRecommended(p.id)}
+                sx={{ p: 1, borderRadius: 2, cursor: 'pointer', mb: 0.5, '&:hover': { bgcolor: '#f5f5f5' },
+                  ...(selectedProducts.includes(p.id) && { bgcolor: '#fef2f2', border: '1px solid #fca5a5' }) }}>
+                <Checkbox checked={selectedProducts.includes(p.id)} size="small" sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
+                {p.image_url ? <Avatar src={getImageUrl(p.image_url)} variant="rounded" sx={{ width: 32, height: 32 }} /> : <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: '#f0f0f0', fontSize: 14 }}>🍔</Avatar>}
+                <Box sx={{ flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 600 }}>{p.name}</Typography></Box>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{parseFloat(p.price).toFixed(2)} ₺</Typography>
+              </Stack>
+            ))}
+          </Box>
+          <Button variant="contained" onClick={saveRecommended} sx={{ fontWeight: 700 }}>💾 Önerileri Kaydet</Button>
         </Card>
       )}
 
@@ -222,6 +277,7 @@ export default function MenuManagement() {
           {form.image_url && <Box component="img" src={getImageUrl(form.image_url)} alt="" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, ml: 1.5 }} />}
           <Box sx={{ mt: 1.5, mb: 1 }}>
             <FormControlLabel control={<Switch name="is_available" checked={form.is_available} onChange={e => setForm(f => ({ ...f, is_available: e.target.checked }))} />} label="Aktif" />
+            <FormControlLabel control={<Checkbox checked={form.is_suggested || false} onChange={e => setForm(f => ({ ...f, is_suggested: e.target.checked }))} />} label="Sepette Önerilenlerde Göster" />
           </Box>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Ekstralar</Typography>
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
@@ -236,6 +292,21 @@ export default function MenuManagement() {
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={() => setShowForm(false)} sx={{ fontWeight: 600 }}>İptal</Button>
           <Button variant="contained" onClick={handleSubmit} sx={{ fontWeight: 600 }}>{editing ? 'Güncelle' : 'Ekle'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Silme Onay Dialogı */}
+      <Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: '#dc2626' }}>Silme Onayı</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mt: 1 }}>
+            <b>"{deleteConfirm?.name}"</b> {deleteConfirm?.type === 'product' ? 'ürününü' : deleteConfirm?.type === 'category' ? 'kategorisini' : 'ekstrasını'} silmek istediğinize emin misiniz?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 1 }}>Bu işlem geri alınamaz.</Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteConfirm(null)} variant="outlined" sx={{ fontWeight: 600 }}>Vazgeç</Button>
+          <Button onClick={confirmDelete} variant="contained" color="error" sx={{ fontWeight: 600 }}>Evet, Sil</Button>
         </DialogActions>
       </Dialog>
     </Box>

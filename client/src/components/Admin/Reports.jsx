@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../api/axios';
+import api from '../../api/api';
 import {
   Box, Typography, Card, TextField, Stack, Chip, Collapse, IconButton,
   Table, TableHead, TableBody, TableRow, TableCell, CircularProgress, Button, Divider
@@ -15,6 +15,8 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [onlineExpanded, setOnlineExpanded] = useState(false);
   const [tableExpanded, setTableExpanded] = useState(false);
+  const [searchFilter, setSearchFilter] = useState('');
+  const [creditExpanded, setCreditExpanded] = useState(false);
 
   const fetchReport = () => {
     setLoading(true);
@@ -30,13 +32,40 @@ export default function Reports() {
     return d.toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  const paymentLabel = (m, type) => m === 'online' ? 'Online Ödeme' : type === 'table' ? 'Masada Ödeme' : 'Kapıda Ödeme';
-  const statusLabels = { pending: 'Bekleyen', confirmed: 'Onaylanan', preparing: 'Hazırlanan', ready: 'Hazır', delivered: 'Teslim Edildi', cancelled: 'İptal' };
+  const paymentLabel = (m, type) => {
+    if (m === 'online') return '💳 Kart';
+    return '💵 Nakit';
+  };
+  const statusLabels = { pending: 'Bekleyen', confirmed: 'Onaylanan', preparing: 'Hazırlanıyor', ready: 'Hazır', delivered: 'Teslim Edildi', cancelled: 'İptal' };
 
   if (loading || !report) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>;
 
   const onlineOrders = report.orderDetails?.filter(o => o.order_type === 'online') || [];
   const tableOrders = report.orderDetails?.filter(o => o.order_type === 'table') || [];
+
+  // Filtre: masa numarası, ismi veya müşteri adı
+  const filterOrders = (orders) => {
+    if (!searchFilter.trim()) return orders;
+    const q = searchFilter.toLowerCase();
+    return orders.filter(o => {
+      const tableNum = o.table?.table_number?.toString() || '';
+      const tableName = (o.table?.table_name || '').toLowerCase();
+      const customerName = o.customer_name ? o.customer_name.toLowerCase() : '';
+      const userName = o.user ? `${o.user.first_name} ${o.user.last_name}`.toLowerCase() : '';
+      return tableNum.includes(q) || tableName.includes(q) || customerName.includes(q) || userName.includes(q) || `#${o.id}`.includes(q);
+    });
+  };
+
+  // Açık hesap: pending ödeme durumundaki müşteriler (customer_name bazlı)
+  const creditOrders = (report.orderDetails || []).filter(o => o.customer_name && o.payment_method !== 'online');
+  const creditByCustomer = {};
+  creditOrders.forEach(o => {
+    const name = o.customer_name;
+    if (!creditByCustomer[name]) creditByCustomer[name] = { name, orders: [], total: 0 };
+    creditByCustomer[name].orders.push(o);
+    creditByCustomer[name].total += parseFloat(o.total_amount);
+  });
+  const creditList = Object.values(creditByCustomer).sort((a, b) => b.total - a.total);
 
   const stats = [
     { label: 'Toplam Sipariş', value: report.totalOrders, color: '#3b82f6' },
@@ -63,18 +92,21 @@ export default function Reports() {
           <TableRow key={o.id} hover>
             <TableCell sx={{ fontWeight: 700 }}>#{o.id}</TableCell>
             <TableCell>
-              {o.user ? `${o.user.first_name} ${o.user.last_name}` : '-'}
-              {o.user?.phone && <Typography variant="caption" display="block" color="text.secondary">{o.user.phone}</Typography>}
+              {o.user ? `${o.user.first_name} ${o.user.last_name}` : (o.customer_name || '-')}
+              {(o.user?.phone || o.customer_phone) && <Typography variant="caption" display="block" color="text.secondary">{o.user?.phone || o.customer_phone}</Typography>}
               {o.delivery_address && <Typography variant="caption" display="block" color="text.secondary">📍 {o.delivery_address}</Typography>}
-              {o.table && <Typography variant="caption" display="block" color="text.secondary">🪑 Masa {o.table.table_number}</Typography>}
+              {o.table && <Typography variant="caption" display="block" color="text.secondary">🪑 {o.table.table_name ? `${o.table.table_name} (${o.table.table_number})` : `Masa ${o.table.table_number}`}</Typography>}
             </TableCell>
             <TableCell>
-              {o.items.map((it, i) => (
-                <Typography key={i} variant="caption" display="block">
-                  {it.quantity}x {it.name}
-                  {it.extras?.length > 0 && <span style={{ color: '#888' }}> (+{it.extras.map(e => e.name).join(', ')})</span>}
-                </Typography>
-              ))}
+              <Typography variant="caption">
+                {o.items.map((it, i) => (
+                  <span key={i}>
+                    {i > 0 && <span style={{ color: '#ccc', margin: '0 4px' }}>|</span>}
+                    {it.quantity}x {it.name}
+                    {it.extras?.length > 0 && <span style={{ color: '#888' }}> (+{it.extras.map(e => `${(e.quantity || 1) > 1 ? (e.quantity||1)+'x ' : ''}${e.name}`).join(', ')})</span>}
+                  </span>
+                ))}
+              </Typography>
             </TableCell>
             <TableCell><Typography variant="caption">{paymentLabel(o.payment_method, o.order_type)}</Typography></TableCell>
             <TableCell><Chip label={statusLabels[o.status] || o.status} size="small" sx={{ fontSize: 11, fontWeight: 600 }} /></TableCell>
@@ -97,6 +129,9 @@ export default function Reports() {
         </Stack>
       </Stack>
 
+      <TextField fullWidth size="small" placeholder="Masa no, masa ismi, müşteri adı veya sipariş # ile ara..."
+        value={searchFilter} onChange={e => setSearchFilter(e.target.value)} sx={{ mb: 2 }} />
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
         {stats.map((s, i) => (
           <Card key={i} sx={{ p: 2.5, textAlign: 'center', borderTop: `3px solid ${s.color}` }}>
@@ -117,9 +152,9 @@ export default function Reports() {
         </Stack>
         <Collapse in={onlineExpanded}>
           <Box sx={{ mt: 1.5 }}>
-            {onlineOrders.length === 0 ? (
+            {filterOrders(onlineOrders).length === 0 ? (
               <Typography color="text.secondary" variant="body2">Online sipariş bulunmuyor.</Typography>
-            ) : renderOrderTable(onlineOrders)}
+            ) : renderOrderTable(filterOrders(onlineOrders))}
           </Box>
         </Collapse>
       </Card>
@@ -135,12 +170,58 @@ export default function Reports() {
         </Stack>
         <Collapse in={tableExpanded}>
           <Box sx={{ mt: 1.5 }}>
-            {tableOrders.length === 0 ? (
+            {filterOrders(tableOrders).length === 0 ? (
               <Typography color="text.secondary" variant="body2">Masa siparişi bulunmuyor.</Typography>
-            ) : renderOrderTable(tableOrders)}
+            ) : renderOrderTable(filterOrders(tableOrders))}
           </Box>
         </Collapse>
       </Card>
+
+      {/* Açık Hesaplar */}
+      {creditList.length > 0 && (
+        <Card sx={{ p: 2.5, mb: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center"
+            onClick={() => setCreditExpanded(!creditExpanded)} sx={{ cursor: 'pointer' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              💰 Açık Hesaplar - Müşteri Bazlı ({creditList.length} müşteri)
+            </Typography>
+            <IconButton size="small">{creditExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>
+          </Stack>
+          <Collapse in={creditExpanded}>
+            <Box sx={{ mt: 1.5 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8', fontSize: 12 } }}>
+                    <TableCell>Müşteri</TableCell>
+                    <TableCell>Sipariş Sayısı</TableCell>
+                    <TableCell>Toplam Borç</TableCell>
+                    <TableCell>Siparişler</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {creditList.map((c, i) => (
+                    <TableRow key={i} hover>
+                      <TableCell sx={{ fontWeight: 700 }}>{c.name}</TableCell>
+                      <TableCell>{c.orders.length}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#dc2626' }}>{c.total.toFixed(2)} ₺</TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {c.orders.map((o, j) => (
+                            <span key={o.id}>
+                              {j > 0 && ', '}
+                              #{o.id} ({parseFloat(o.total_amount).toFixed(2)}₺)
+                            </span>
+                          ))}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          </Collapse>
+        </Card>
+      )}
 
       {/* Ürün Bazlı Satışlar */}
       <Card sx={{ p: 2.5, mb: 3 }}>

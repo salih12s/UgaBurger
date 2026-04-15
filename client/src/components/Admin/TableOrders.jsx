@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../api/axios';
-import { getImageUrl } from '../../api/axios';
+import api, { getImageUrl } from '../../api/api';
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Card, TextField, Button, Chip, Stack, IconButton,
@@ -15,21 +14,27 @@ export default function TableOrders() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [newTableNum, setNewTableNum] = useState('');
+  const [newTableName, setNewTableName] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
 
   const [selectedTable, setSelectedTable] = useState('');
   const [cartItems, setCartItems] = useState([]);
   const [orderNote, setOrderNote] = useState('');
   const [paymentType, setPaymentType] = useState('cash');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [settings, setSettings] = useState({});
 
   // Extras dialog
-  const [extrasDialog, setExtrasDialog] = useState(null); // product with extras
+  const [extrasDialog, setExtrasDialog] = useState(null);
   const [selectedExtras, setSelectedExtras] = useState([]);
 
   useEffect(() => {
     fetchTables();
     api.get('/admin/products').then(res => setProducts(res.data));
     api.get('/categories').then(res => setCategories(res.data));
+    api.get('/admin/settings').then(res => setSettings(res.data));
   }, []);
 
   const fetchTables = () => api.get('/admin/tables').then(res => setTables(res.data));
@@ -37,9 +42,10 @@ export default function TableOrders() {
   const addTable = async () => {
     if (!newTableNum) return;
     try {
-      await api.post('/admin/tables', { table_number: parseInt(newTableNum) });
+      await api.post('/admin/tables', { table_number: parseInt(newTableNum), table_name: newTableName || null });
       toast.success('Masa eklendi');
       setNewTableNum('');
+      setNewTableName('');
       fetchTables();
     } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
   };
@@ -62,11 +68,21 @@ export default function TableOrders() {
   };
 
   const toggleExtra = (extra) => {
-    setSelectedExtras(prev =>
-      prev.find(e => e.id === extra.id)
-        ? prev.filter(e => e.id !== extra.id)
-        : [...prev, { id: extra.id, name: extra.name, price: extra.price }]
-    );
+    setSelectedExtras(prev => {
+      const existing = prev.find(e => e.id === extra.id);
+      if (existing) {
+        return prev.filter(e => e.id !== extra.id);
+      }
+      return [...prev, { id: extra.id, name: extra.name, price: extra.price, quantity: 1 }];
+    });
+  };
+
+  const changeExtraQty = (extraId, delta) => {
+    setSelectedExtras(prev => prev.map(e => {
+      if (e.id !== extraId) return e;
+      const newQty = e.quantity + delta;
+      return newQty >= 1 ? { ...e, quantity: newQty } : e;
+    }));
   };
 
   const confirmExtras = () => {
@@ -78,7 +94,7 @@ export default function TableOrders() {
   };
 
   const addToCart = (product, extras) => {
-    const extrasKey = extras.map(e => e.id).sort().join(',');
+    const extrasKey = extras.map(e => `${e.id}:${e.quantity || 1}`).sort().join(',');
     setCartItems(prev => {
       const existing = prev.find(i => i.product_id === product.id && i._extrasKey === extrasKey);
       if (existing) return prev.map(i => (i.product_id === product.id && i._extrasKey === extrasKey) ? { ...i, quantity: i.quantity + 1 } : i);
@@ -100,14 +116,83 @@ export default function TableOrders() {
 
   const cartTotal = cartItems.reduce((s, i) => {
     if (i.isFree) return s;
-    const extrasTotal = i.extras.reduce((es, e) => es + parseFloat(e.price), 0);
+    const extrasTotal = i.extras.reduce((es, e) => es + parseFloat(e.price) * (e.quantity || 1), 0);
     return s + (parseFloat(i.price) + extrasTotal) * i.quantity;
   }, 0);
+
+  const printReceipt = (order) => {
+    const items = order.items || [];
+    const d = new Date(order.createdAt || order.created_at);
+    const dateStr = d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const type = order.order_type === 'online'
+      ? `ONLINE: ${order.delivery_address || '-'}`
+      : `MASA: ${order.table ? order.table.table_number : '-'}`;
+    const customer = order.customer_name || '-';
+    const phone = order.customer_phone || '';
+    const payment = order.payment_method === 'online' ? '💳 Kart' : '💵 Nakit';
+
+    const rTitle = settings.receipt_title || 'UGA BURGER';
+    const rFooter = settings.receipt_footer || 'Afiyet Olsun!';
+    const rFontPx = { small: 10, medium: 12, large: 14 }[settings.receipt_font_size] || 12;
+
+    let itemsHtml = '';
+    items.forEach(item => {
+      const name = item.product?.name || item.name || 'Ürün';
+      const price = (parseFloat(item.unit_price) * item.quantity).toFixed(2);
+      itemsHtml += `<tr><td>${item.quantity}x ${name}</td><td style="text-align:right">${price} TL</td></tr>`;
+      const extras = item.extras || [];
+      if (extras.length > 0) {
+        extras.forEach(e => {
+          const qty = e.quantity || 1;
+          itemsHtml += `<tr><td style="padding-left:8px;font-size:${rFontPx - 2}px">+ ${qty > 1 ? qty + 'x ' : ''}${e.name}</td><td style="text-align:right;font-size:${rFontPx - 2}px">${(parseFloat(e.price) * qty).toFixed(2)} TL</td></tr>`;
+        });
+      }
+    });
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fiş</title>
+<style>
+  @page { size: 80mm auto; margin: 2mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: ${rFontPx}px; width: 76mm; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .sep { border-top: 1px dashed #000; margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 1px 0; vertical-align: top; }
+  .total { font-size: ${rFontPx + 4}px; font-weight: bold; }
+</style></head><body>
+  <div class="center bold" style="font-size:${rFontPx + 6}px;margin-bottom:2px">${rTitle}</div>
+  <div class="sep"></div>
+  <div class="bold center" style="font-size:${rFontPx + 2}px">#${order.id}</div>
+  <div class="center" style="font-size:${rFontPx - 2}px">${dateStr}</div>
+  <div class="sep"></div>
+  <div style="font-size:${rFontPx - 1}px">${type}</div>
+  ${customer !== '-' ? `<div style="font-size:${rFontPx - 1}px">Müşteri: ${customer}</div>` : ''}
+  ${phone ? `<div style="font-size:${rFontPx - 1}px">Tel: ${phone}</div>` : ''}
+  ${order.delivery_address ? `<div style="font-size:${rFontPx - 1}px">Adres: ${order.delivery_address}</div>` : ''}
+  <div class="sep"></div>
+  <table>${itemsHtml}</table>
+  <div class="sep"></div>
+  <table><tr><td class="total">TOPLAM:</td><td class="total" style="text-align:right">${parseFloat(order.total_amount).toFixed(2)} TL</td></tr></table>
+  <div class="sep"></div>
+  <div class="center" style="font-size:${rFontPx - 2}px">Ödeme: ${payment}</div>
+  ${order.order_note ? `<div class="center" style="font-size:${rFontPx - 2}px">Not: ${order.order_note}</div>` : ''}
+  <div class="sep"></div>
+  <div class="center" style="font-size:${rFontPx - 2}px;margin-top:4px">${rFooter}</div>
+  <div class="center" style="font-size:${rFontPx - 3}px;margin-top:2px">--- SON ---</div>
+</body></html>`;
+
+    const win = window.open('', '_blank', 'width=320,height=600');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
 
   const submitQuickOrder = async () => {
     if (cartItems.length === 0) { toast.error('Ürün seçiniz'); return; }
     try {
-      await api.post('/admin/quick-order', {
+      const res = await api.post('/admin/quick-order', {
         items: cartItems.map(i => ({
           product_id: i.product_id, quantity: i.quantity, extras: i.extras,
           unit_price_override: i.isFree ? 0 : undefined
@@ -115,9 +200,14 @@ export default function TableOrders() {
         table_id: selectedTable ? parseInt(selectedTable) : null,
         order_note: orderNote,
         payment_method: paymentType,
+        customer_name: customerName || null,
+        customer_phone: customerPhone || null,
+        delivery_address: customerAddress || null,
       });
       toast.success('Hızlı sipariş oluşturuldu!');
       setCartItems([]); setOrderNote(''); setSelectedTable(''); setPaymentType('cash');
+      setCustomerName(''); setCustomerPhone(''); setCustomerAddress('');
+      setTimeout(() => printReceipt(res.data), 100);
     } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
   };
 
@@ -131,12 +221,13 @@ export default function TableOrders() {
       <Card sx={{ p: 2.5, mb: 3 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>Masa Yönetimi</Typography>
         <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-          <TextField size="small" type="number" placeholder="Masa No" value={newTableNum} onChange={e => setNewTableNum(e.target.value)} sx={{ width: 120 }} />
+          <TextField size="small" type="number" placeholder="Masa No" value={newTableNum} onChange={e => setNewTableNum(e.target.value)} sx={{ width: 100 }} />
+          <TextField size="small" placeholder="Masa İsmi (opsiyonel)" value={newTableName} onChange={e => setNewTableName(e.target.value)} sx={{ width: 180 }} />
           <Button variant="contained" startIcon={<AddIcon />} onClick={addTable} sx={{ fontWeight: 600 }}>Ekle</Button>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
           {tables.map(t => (
-            <Chip key={t.id} label={`Masa ${t.table_number}`} onDelete={() => deleteTable(t.id)} deleteIcon={<DeleteIcon fontSize="small" />} variant="outlined" />
+            <Chip key={t.id} label={t.table_name ? `${t.table_name} (${t.table_number})` : `Masa ${t.table_number}`} onDelete={() => deleteTable(t.id)} deleteIcon={<DeleteIcon fontSize="small" />} variant="outlined" />
           ))}
         </Stack>
       </Card>
@@ -177,9 +268,17 @@ export default function TableOrders() {
             <InputLabel>Masa seçiniz (opsiyonel)</InputLabel>
             <Select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} label="Masa seçiniz (opsiyonel)">
               <MenuItem value="">Seçilmedi</MenuItem>
-              {tables.map(t => <MenuItem key={t.id} value={t.id}>Masa {t.table_number}</MenuItem>)}
+              {tables.map(t => <MenuItem key={t.id} value={t.id}>{t.table_name ? `${t.table_name} (${t.table_number})` : `Masa ${t.table_number}`}</MenuItem>)}
             </Select>
           </FormControl>
+
+          <Stack spacing={1} sx={{ mb: 1.5 }}>
+            <Stack direction="row" spacing={1}>
+              <TextField size="small" placeholder="Tel No" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} sx={{ flex: 1 }} />
+              <TextField size="small" placeholder="Müşteri Adı" value={customerName} onChange={e => setCustomerName(e.target.value)} sx={{ flex: 1 }} />
+            </Stack>
+            <TextField size="small" fullWidth placeholder="Adres" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+          </Stack>
 
           {cartItems.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2.5 }}>Ürün seçiniz</Typography>
@@ -191,11 +290,11 @@ export default function TableOrders() {
                     <Typography variant="body2" sx={{ fontWeight: 600, textDecoration: item.isFree ? 'line-through' : 'none' }}>{item.name}</Typography>
                     {item.extras.length > 0 && (
                       <Typography variant="caption" sx={{ color: '#8b5cf6', display: 'block' }}>
-                        + {item.extras.map(e => e.name).join(', ')}
+                        + {item.extras.map(e => `${(e.quantity || 1) > 1 ? (e.quantity || 1) + 'x ' : ''}${e.name} (${(parseFloat(e.price) * (e.quantity || 1)).toFixed(2)} TL)`).join(', ')}
                       </Typography>
                     )}
                     <Typography variant="caption" sx={{ color: item.isFree ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-                      {item.isFree ? 'ÜCRETSİZ' : `${((parseFloat(item.price) + item.extras.reduce((s, e) => s + parseFloat(e.price), 0)) * item.quantity).toFixed(2)} TL`}
+                      {item.isFree ? 'ÜCRETSİZ' : `${((parseFloat(item.price) + item.extras.reduce((s, e) => s + parseFloat(e.price) * (e.quantity || 1), 0)) * item.quantity).toFixed(2)} TL`}
                     </Typography>
                   </Box>
                   <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -237,27 +336,46 @@ export default function TableOrders() {
         </Card>
       </Box>
 
-      {/* Extras Dialog */}
       <Dialog open={!!extrasDialog} onClose={() => setExtrasDialog(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>{extrasDialog?.name} - Ekstra Seç</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>İstediğiniz ekstraları seçin:</Typography>
           <Stack spacing={1}>
-            {extrasDialog?.extras?.filter(e => e.is_available !== false).map(extra => (
-              <Chip key={extra.id} label={`${extra.name} (+${parseFloat(extra.price).toFixed(2)} TL)`}
-                onClick={() => toggleExtra(extra)}
-                variant={selectedExtras.find(e => e.id === extra.id) ? 'filled' : 'outlined'}
-                sx={{
-                  fontWeight: 600, justifyContent: 'flex-start', height: 40,
-                  ...(selectedExtras.find(e => e.id === extra.id) && { bgcolor: '#8b5cf6', color: '#fff' })
-                }} />
-            ))}
+            {extrasDialog?.extras?.filter(e => e.is_available !== false).map(extra => {
+              const selected = selectedExtras.find(e => e.id === extra.id);
+              return (
+                <Stack key={extra.id} direction="row" alignItems="center" spacing={1}>
+                  <Chip
+                    label={`${extra.name} (+${parseFloat(extra.price).toFixed(2)} TL)`}
+                    onClick={() => toggleExtra(extra)}
+                    variant={selected ? 'filled' : 'outlined'}
+                    sx={{
+                      fontWeight: 600, justifyContent: 'flex-start', height: 40, flex: 1,
+                      ...(selected && { bgcolor: '#8b5cf6', color: '#fff' })
+                    }}
+                  />
+                  {selected && (
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <IconButton size="small" onClick={() => changeExtraQty(extra.id, -1)}
+                        sx={{ border: 1, borderColor: '#ddd', width: 28, height: 28 }}>
+                        <RemoveIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      <Typography sx={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{selected.quantity}</Typography>
+                      <IconButton size="small" onClick={() => changeExtraQty(extra.id, 1)}
+                        sx={{ border: 1, borderColor: '#ddd', width: 28, height: 28 }}>
+                        <AddIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Stack>
+                  )}
+                </Stack>
+              );
+            })}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => { addToCart(extrasDialog, []); setExtrasDialog(null); }} sx={{ fontWeight: 600 }}>Ekstrasız Ekle</Button>
           <Button variant="contained" onClick={confirmExtras} sx={{ fontWeight: 600 }}>
-            {selectedExtras.length > 0 ? `Seçilenlerle Ekle (${selectedExtras.length})` : 'Ekle'}
+            {selectedExtras.length > 0 ? `Seçilenlerle Ekle (${selectedExtras.reduce((s, e) => s + (e.quantity || 1), 0)})` : 'Ekle'}
           </Button>
         </DialogActions>
       </Dialog>

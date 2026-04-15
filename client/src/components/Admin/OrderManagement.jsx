@@ -1,32 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../../api/axios';
+import api from '../../api/api';
 import toast from 'react-hot-toast';
-import { Box, Typography, Chip, Card, Button, Stack, Divider, Collapse, IconButton } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { Box, Typography, Chip, Card, Button, Stack, Divider, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 
 const statusLabels = {
   pending: 'Bekleyen',
-  confirmed: 'Onaylanan',
-  preparing: 'Hazırlanan',
-  ready: 'Hazır',
+  preparing: 'Hazırlanıyor',
   delivered: 'Teslim Edildi',
   cancelled: 'İptal',
 };
 
 const nextStatus = {
-  pending: 'confirmed',
-  confirmed: 'preparing',
-  preparing: 'ready',
-  ready: 'delivered',
+  pending: 'preparing',
+  preparing: 'delivered',
 };
 
 const statusColors = {
   pending: '#f59e0b',
-  confirmed: '#3b82f6',
   preparing: '#8b5cf6',
-  ready: '#16a34a',
   delivered: '#64748b',
   cancelled: '#dc2626',
 };
@@ -34,8 +26,9 @@ const statusColors = {
 export default function OrderManagement() {
   const [orders, setOrders] = useState([]);
   const [activeStatus, setActiveStatus] = useState('pending');
-  const [expandedOrder, setExpandedOrder] = useState(null);
   const [settings, setSettings] = useState({});
+  const [cancelConfirm, setCancelConfirm] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchOrders = useCallback(() => {
     api.get('/admin/orders').then(res => setOrders(res.data));
@@ -49,16 +42,28 @@ export default function OrderManagement() {
 
   useEffect(() => { api.get('/admin/settings').then(res => setSettings(res.data)); }, []);
 
-  const filteredOrders = orders.filter(o => o.status === activeStatus);
+  // Map old statuses to new ones for filtering
+  const mapStatus = (s) => (s === 'confirmed' || s === 'ready') ? 'preparing' : s;
+  const filteredOrders = orders
+    .filter(o => mapStatus(o.status) === activeStatus)
+    .filter(o => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return `#${o.id}`.includes(q) || String(o.id).includes(q);
+    });
   const statusCounts = {};
   Object.keys(statusLabels).forEach(s => {
-    statusCounts[s] = orders.filter(o => o.status === s).length;
+    statusCounts[s] = orders.filter(o => mapStatus(o.status) === s).length;
   });
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus, order) => {
     try {
       await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
       toast.success(`Sipariş ${statusLabels[newStatus]} durumuna güncellendi`);
+      // Bekleyenden hazırlamaya geçerken otomatik fiş yazdır
+      if (newStatus === 'preparing' && order) {
+        printReceipt(order);
+      }
       fetchOrders();
     } catch {
       toast.error('Güncelleme hatası');
@@ -86,8 +91,8 @@ export default function OrderManagement() {
     const type = order.order_type === 'online'
       ? `ONLINE: ${order.delivery_address || '-'}`
       : `MASA: ${order.table ? order.table.table_number : '-'}`;
-    const customer = order.user ? `${order.user.first_name} ${order.user.last_name}` : '-';
-    const phone = order.user?.phone || '';
+    const customer = order.user ? `${order.user.first_name} ${order.user.last_name}` : (order.customer_name || '-');
+    const phone = order.user?.phone || order.customer_phone || '';
     const payment = paymentLabel(order.payment_method, order.order_type);
 
     const rTitle = settings.receipt_title || 'MUSATTI BURGER';
@@ -107,7 +112,8 @@ export default function OrderManagement() {
       itemsHtml += `<tr><td>${item.quantity}x ${name}</td>${showPrices ? `<td style="text-align:right">${price} TL</td>` : ''}</tr>`;
       if (item.extras?.length > 0) {
         item.extras.forEach(e => {
-          itemsHtml += `<tr><td style="padding-left:8px;font-size:${rFontPx - 2}px">+ ${e.name}</td>${showPrices ? `<td style="text-align:right;font-size:${rFontPx - 2}px">${parseFloat(e.price).toFixed(2)} TL</td>` : ''}</tr>`;
+          const qty = e.quantity || 1;
+          itemsHtml += `<tr><td style="padding-left:8px;font-size:${rFontPx - 2}px">+ ${qty > 1 ? qty + 'x ' : ''}${e.name}</td>${showPrices ? `<td style="text-align:right;font-size:${rFontPx - 2}px">${(parseFloat(e.price) * qty).toFixed(2)} TL</td>` : ''}</tr>`;
         });
       }
     });
@@ -131,6 +137,7 @@ export default function OrderManagement() {
   ${showTable ? `<div class="sep"></div><div style="font-size:${rFontPx - 1}px">${type}</div>` : ''}
   <div style="font-size:${rFontPx - 1}px">Müşteri: ${customer}</div>
   ${phone ? `<div style="font-size:${rFontPx - 1}px">Tel: ${phone}</div>` : ''}
+  ${order.delivery_address ? `<div style="font-size:${rFontPx - 1}px">Adres: ${order.delivery_address}</div>` : ''}
   <div class="sep"></div>
   <table>${itemsHtml}</table>
   <div class="sep"></div>
@@ -153,7 +160,7 @@ export default function OrderManagement() {
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>Sipariş Yönetimi</Typography>
 
-      <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 3, '&::-webkit-scrollbar': { display: 'none' } }}>
+      <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 2, '&::-webkit-scrollbar': { display: 'none' } }}>
         {Object.entries(statusLabels).map(([key, label]) => (
           <Chip key={key} label={`${label} (${statusCounts[key] || 0})`}
             onClick={() => setActiveStatus(key)}
@@ -165,12 +172,14 @@ export default function OrderManagement() {
         ))}
       </Stack>
 
+      <TextField fullWidth size="small" placeholder="Sipariş numarası ile ara... (örn: 11)"
+        value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ mb: 2 }} />
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
         {filteredOrders.length === 0 ? (
           <Typography color="text.secondary" sx={{ p: 2.5 }}>Bu durumda sipariş bulunmuyor.</Typography>
         ) : (
           filteredOrders.map(order => {
-            const isExpanded = expandedOrder === order.id;
             return (
             <Card key={order.id} sx={{ p: 2.5 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
@@ -178,14 +187,14 @@ export default function OrderManagement() {
               </Stack>
               <Chip label={order.order_type === 'online' ? `🌐 Online` : `🪑 Masa${order.table ? ` - Masa ${order.table.table_number}` : ''}`}
                 size="small" sx={{ mb: 1.5, bgcolor: order.order_type === 'online' ? '#dbeafe' : '#fef3c7', fontWeight: 500 }} />
-              {order.user && (
+              {(order.user || order.customer_name) && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                  👤 {order.user.first_name} {order.user.last_name}
+                  👤 {order.user ? `${order.user.first_name} ${order.user.last_name}` : order.customer_name}
                 </Typography>
               )}
-              {order.user?.phone && (
+              {(order.user?.phone || order.customer_phone) && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                  📞 {order.user.phone}
+                  📞 {order.user?.phone || order.customer_phone}
                 </Typography>
               )}
               {order.delivery_address && (
@@ -206,46 +215,35 @@ export default function OrderManagement() {
                     </Typography>
                     {item.extras?.length > 0 && (
                       <Typography variant="caption" sx={{ color: '#8b5cf6', display: 'block', ml: 2 }}>
-                        + {item.extras.map(e => `${e.name} (${parseFloat(e.price).toFixed(2)} ₺)`).join(', ')}
+                        + {item.extras.map(e => `${(e.quantity || 1) > 1 ? (e.quantity || 1) + 'x ' : ''}${e.name} (${(parseFloat(e.price) * (e.quantity || 1)).toFixed(2)} ₺)`).join(', ')}
                       </Typography>
                     )}
                   </Box>
                 ))}
               </Box>
 
-              {/* Detaylar toggle */}
-              <Box onClick={() => setExpandedOrder(isExpanded ? null : order.id)} sx={{ cursor: 'pointer', mb: 1 }}>
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: '#3b82f6' }}>
-                    {isExpanded ? 'Detayları Gizle' : 'Detayları Göster'}
-                  </Typography>
-                  {isExpanded ? <ExpandLessIcon sx={{ fontSize: 16, color: '#3b82f6' }} /> : <ExpandMoreIcon sx={{ fontSize: 16, color: '#3b82f6' }} />}
-                </Stack>
-              </Box>
-              <Collapse in={isExpanded}>
-                <Divider sx={{ mb: 1 }} />
-                <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-                  <Typography variant="caption">Ödeme: <b>{paymentLabel(order.payment_method, order.order_type)}</b></Typography>
-                  <Typography variant="caption">
-                    Ödeme Durumu: <Chip label={paymentStatusLabel(order.payment_status)} size="small"
-                      sx={{ fontSize: 10, fontWeight: 700, bgcolor: paymentStatusColor(order.payment_status), color: '#fff', height: 20 }} />
-                  </Typography>
-                  {order.order_note && (
-                    <Typography variant="caption">📝 Not: {order.order_note}</Typography>
-                  )}
-                </Stack>
-              </Collapse>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                <Typography variant="caption">Ödeme: <b>{paymentLabel(order.payment_method, order.order_type)}</b></Typography>
+                <Typography variant="caption">
+                  Ödeme Durumu: <Chip label={paymentStatusLabel(order.payment_status)} size="small"
+                    sx={{ fontSize: 10, fontWeight: 700, bgcolor: paymentStatusColor(order.payment_status), color: '#fff', height: 20 }} />
+                </Typography>
+                {order.order_note && (
+                  <Typography variant="caption">📝 Not: {order.order_note}</Typography>
+                )}
+              </Stack>
 
               <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#dc2626', mb: 1.5 }}>{parseFloat(order.total_amount).toFixed(2)} TL</Typography>
               <Stack direction="row" spacing={1}>
                 {nextStatus[order.status] && (
-                  <Button size="small" variant="contained" color="success" onClick={() => handleStatusChange(order.id, nextStatus[order.status])}
+                  <Button size="small" variant="contained" color="success" onClick={() => handleStatusChange(order.id, nextStatus[order.status], order)}
                     sx={{ fontWeight: 600, fontSize: 12 }}>
                     → {statusLabels[nextStatus[order.status]]}
                   </Button>
                 )}
                 {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                  <Button size="small" variant="outlined" color="error" onClick={() => handleStatusChange(order.id, 'cancelled')}
+                  <Button size="small" variant="outlined" color="error" onClick={() => setCancelConfirm(order)}
                     sx={{ fontWeight: 600, fontSize: 12 }}>
                     İptal
                   </Button>
@@ -259,6 +257,42 @@ export default function OrderManagement() {
           );})
         )}
       </Box>
+
+      {/* İptal Onay Modalı */}
+      <Dialog open={!!cancelConfirm} onClose={() => setCancelConfirm(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: '#dc2626' }}>Siparişi İptal Et</DialogTitle>
+        <DialogContent>
+          {cancelConfirm && (
+            <Box>
+              <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 600 }}>
+                #{cancelConfirm.id} numaralı siparişi iptal etmek istediğinize emin misiniz?
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              {cancelConfirm.user && (
+                <Typography variant="body2" sx={{ mb: 0.5 }}>👤 {cancelConfirm.user.first_name} {cancelConfirm.user.last_name}</Typography>
+              )}
+              {cancelConfirm.user?.phone && (
+                <Typography variant="body2" sx={{ mb: 0.5 }}>📞 {cancelConfirm.user.phone}</Typography>
+              )}
+              {cancelConfirm.items?.map((item, i) => (
+                <Typography key={i} variant="body2" sx={{ mb: 0.3 }}>
+                  {item.quantity}x {item.product?.name || 'Ürün'} ({(parseFloat(item.unit_price) * item.quantity).toFixed(2)} TL)
+                </Typography>
+              ))}
+              <Typography sx={{ fontWeight: 800, fontSize: 16, color: '#dc2626', mt: 1 }}>
+                Toplam: {parseFloat(cancelConfirm.total_amount).toFixed(2)} TL
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCancelConfirm(null)} variant="outlined" sx={{ fontWeight: 600 }}>Vazgeç</Button>
+          <Button onClick={() => { handleStatusChange(cancelConfirm.id, 'cancelled', null); setCancelConfirm(null); }}
+            variant="contained" color="error" sx={{ fontWeight: 600 }}>
+            Evet, İptal Et
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
