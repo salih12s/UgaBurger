@@ -97,7 +97,7 @@ export default function OrderManagement() {
 
     const rTitle = settings.receipt_title || 'MUSATTI BURGER';
     const rFooter = settings.receipt_footer || 'Afiyet Olsun!';
-    const rFontPx = { small: 10, medium: 12, large: 14 }[settings.receipt_font_size] || 12;
+    const rFontPx = { small: 12, medium: 14, large: 16 }[settings.receipt_font_size] || 14;
     const showDate = settings.receipt_show_date !== 'false';
     const showTime = settings.receipt_show_time !== 'false';
     const showOrderNo = settings.receipt_show_order_no !== 'false';

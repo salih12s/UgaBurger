@@ -133,7 +133,7 @@ export default function TableOrders() {
 
     const rTitle = settings.receipt_title || 'UGA BURGER';
     const rFooter = settings.receipt_footer || 'Afiyet Olsun!';
-    const rFontPx = { small: 10, medium: 12, large: 14 }[settings.receipt_font_size] || 12;
+    const rFontPx = { small: 12, medium: 14, large: 16 }[settings.receipt_font_size] || 14;
 
     let itemsHtml = '';
     items.forEach(item => {

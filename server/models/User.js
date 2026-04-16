@@ -10,6 +10,8 @@ const User = sequelize.define('User', {
   password_hash: { type: DataTypes.STRING(255), allowNull: false },
   role: { type: DataTypes.ENUM('customer', 'admin'), defaultValue: 'customer' },
   addresses: { type: DataTypes.TEXT, allowNull: true, defaultValue: '[]' },
+  reset_code: { type: DataTypes.STRING(6), allowNull: true, defaultValue: null },
+  reset_code_expires: { type: DataTypes.DATE, allowNull: true, defaultValue: null },
 }, { tableName: 'users' });
 
 module.exports = User;

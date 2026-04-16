@@ -32,6 +32,9 @@ export default function OrderDialog({ onClose, products }) {
   const [userAddresses, setUserAddresses] = useState([]);
   const [selectedAddressIdx, setSelectedAddressIdx] = useState(-1);
   const [newAddress, setNewAddress] = useState('');
+  const [promoCode, setPromoCode] = useState('');
+  const [promoResult, setPromoResult] = useState(null);
+  const [promoLoading, setPromoLoading] = useState(false);
 
   useEffect(() => { api.get('/settings').then(res => setSettings(res.data)); }, []);
 
@@ -77,6 +80,23 @@ export default function OrderDialog({ onClose, products }) {
     addItem(product, 1, []);
   };
 
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    try {
+      const res = await api.post('/orders/validate-promo', { code: promoCode, order_total: totalAmount });
+      setPromoResult(res.data);
+      toast.success(`İndirim uygulandı: -${res.data.discount_amount.toFixed(2)} TL`);
+    } catch (err) {
+      setPromoResult(null);
+      toast.error(err.response?.data?.error || 'Geçersiz kod');
+    } finally { setPromoLoading(false); }
+  };
+
+  const removePromo = () => { setPromoResult(null); setPromoCode(''); };
+
+  const finalTotal = promoResult ? promoResult.new_total : totalAmount;
+
   const handleConfirm = async () => {
     if (!user) { toast.error('Sipariş vermek için giriş yapınız'); navigate('/login'); return; }
     const addr = selectedAddressIdx === -1 ? newAddress : deliveryAddress;
@@ -95,6 +115,7 @@ export default function OrderDialog({ onClose, products }) {
         delivery_address: addr,
         order_note: orderNote, payment_method: 'online',
         card_info: { holder: cardName, last4, expiry: cardExpiry },
+        promo_code: promoResult ? promoResult.code : null,
       });
       setSuccessOrder(res.data);
       clearCart();
@@ -105,13 +126,15 @@ export default function OrderDialog({ onClose, products }) {
   // Başarı ekranı
   if (successOrder) {
     return (
-      <Dialog open onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4, textAlign: 'center', p: 4 } }}>
-        <CheckCircleIcon sx={{ fontSize: 80, color: '#16a34a', mx: 'auto', mb: 2 }} />
+      <Dialog open onClose={onClose} maxWidth="xs" fullWidth
+        sx={{ '& .MuiDialog-container': { alignItems: 'center', justifyContent: 'center' } }}
+        PaperProps={{ sx: { borderRadius: 4, textAlign: 'center', p: 4, mx: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' } }}>
+        <CheckCircleIcon sx={{ fontSize: 80, color: '#16a34a', mb: 2 }} />
         <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Siparişiniz Alındı!</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Siparişiniz başarıyla oluşturuldu. En kısa sürede hazırlanacaktır.
         </Typography>
-        <Box sx={{ bgcolor: '#f0fdf4', borderRadius: 3, p: 2, mb: 3 }}>
+        <Box sx={{ bgcolor: '#f0fdf4', borderRadius: 3, p: 2, mb: 3, width: '100%' }}>
           <Typography variant="caption" color="text.secondary">Sipariş Numaranız</Typography>
           <Typography variant="h4" sx={{ fontWeight: 900, color: '#16a34a' }}>#{successOrder.id || successOrder.order?.id}</Typography>
         </Box>
@@ -241,14 +264,45 @@ export default function OrderDialog({ onClose, products }) {
               <Typography variant="caption" sx={{ fontWeight: 600, color: canOrder ? 'inherit' : '#dc2626' }}>{minOrder.toFixed(2)} TL</Typography>
             </Stack>
             <LinearProgress variant="determinate" value={progress} sx={{ height: 4, borderRadius: 2, mb: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: canOrder ? '#16a34a' : '#dc2626' } }} />
+
+            {/* Promosyon Kodu */}
+            <Box sx={{ mb: 1.5 }}>
+              {promoResult ? (
+                <Stack direction="row" alignItems="center" sx={{ p: 1.2, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#16a34a' }}>🎟️ {promoResult.code}</Typography>
+                    <Typography variant="caption" display="block" color="text.secondary">
+                      {promoResult.discount_type === 'percentage' ? `%${promoResult.discount_value} indirim` : `${promoResult.discount_value.toFixed(2)} TL indirim`}
+                      {' → '}-{promoResult.discount_amount.toFixed(2)} TL
+                    </Typography>
+                  </Box>
+                  <Button size="small" color="error" onClick={removePromo} sx={{ minWidth: 'auto', fontSize: 11 }}>Kaldır</Button>
+                </Stack>
+              ) : (
+                <Stack direction="row" spacing={1}>
+                  <TextField size="small" placeholder="Promosyon kodu" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} sx={{ flex: 1 }} inputProps={{ style: { fontSize: 13 } }} />
+                  <Button variant="outlined" size="small" onClick={handleApplyPromo} disabled={promoLoading || !promoCode.trim()}
+                    sx={{ fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>
+                    {promoLoading ? '...' : 'Uygula'}
+                  </Button>
+                </Stack>
+              )}
+            </Box>
+
             <Divider sx={{ my: 1.5 }} />
             <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
               <Typography variant="body2" sx={{ mr: 1 }}>Ara Toplam: </Typography>
               <Typography variant="body2">{totalAmount.toFixed(2)} TL</Typography>
             </Stack>
+            {promoResult && (
+              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                <Typography variant="body2" sx={{ mr: 1, color: '#16a34a' }}>İndirim: </Typography>
+                <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 600 }}>-{promoResult.discount_amount.toFixed(2)} TL</Typography>
+              </Stack>
+            )}
             <Stack direction="row" justifyContent="space-between">
               <Typography variant="h6" sx={{ fontWeight: 800, mr: 1 }}>Toplam</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>{totalAmount.toFixed(2)} TL</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>{finalTotal.toFixed(2)} TL</Typography>
             </Stack>
             <FormControlLabel
               control={<Checkbox checked={kvkkAccepted} onChange={e => setKvkkAccepted(e.target.checked)} size="small" sx={{ '&.Mui-checked': { color: '#dc2626' } }} />}

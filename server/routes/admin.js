@@ -44,4 +44,10 @@ router.get('/reports/daily', ctrl.getDailyReport);
 router.get('/settings', ctrl.getSettings);
 router.put('/settings', ctrl.updateSetting);
 
+// Promo Codes
+router.get('/promo-codes', ctrl.getPromoCodes);
+router.post('/promo-codes', ctrl.createPromoCode);
+router.put('/promo-codes/:id', ctrl.updatePromoCode);
+router.delete('/promo-codes/:id', ctrl.deletePromoCode);
+
 module.exports = router;

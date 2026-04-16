@@ -56,6 +56,10 @@ export default function Reports() {
     });
   };
 
+  const filteredOnlineOrders = filterOrders(onlineOrders);
+  const filteredTableOrders = filterOrders(tableOrders);
+  const isFiltered = searchFilter.trim() !== '';
+
   // Açık hesap: pending ödeme durumundaki müşteriler (customer_name bazlı)
   const creditOrders = (report.orderDetails || []).filter(o => o.customer_name && o.payment_method !== 'online');
   const creditByCustomer = {};
@@ -67,11 +71,18 @@ export default function Reports() {
   });
   const creditList = Object.values(creditByCustomer).sort((a, b) => b.total - a.total);
 
+  const displayTotalOrders = isFiltered ? filteredOnlineOrders.length + filteredTableOrders.length : report.totalOrders;
+  const displayTotalRevenue = isFiltered ? [...filteredOnlineOrders, ...filteredTableOrders].reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.totalRevenue);
+  const displayOnlineCount = isFiltered ? filteredOnlineOrders.length : report.onlineOrders;
+  const displayOnlineRevenue = isFiltered ? filteredOnlineOrders.reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.onlineRevenue || 0);
+  const displayTableCount = isFiltered ? filteredTableOrders.length : report.tableOrders;
+  const displayTableRevenue = isFiltered ? filteredTableOrders.reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.tableRevenue || 0);
+
   const stats = [
-    { label: 'Toplam Sipariş', value: report.totalOrders, color: '#3b82f6' },
-    { label: 'Toplam Gelir', value: `${parseFloat(report.totalRevenue).toFixed(2)} ₺`, color: '#16a34a' },
-    { label: 'Online Sipariş', value: `${report.onlineOrders} (${parseFloat(report.onlineRevenue || 0).toFixed(2)} ₺)`, color: '#8b5cf6' },
-    { label: 'Masa Siparişi', value: `${report.tableOrders} (${parseFloat(report.tableRevenue || 0).toFixed(2)} ₺)`, color: '#f59e0b' },
+    { label: 'Toplam Sipariş', value: displayTotalOrders, color: '#3b82f6' },
+    { label: 'Toplam Gelir', value: `${displayTotalRevenue.toFixed(2)} ₺`, color: '#16a34a' },
+    { label: 'Online Sipariş', value: `${displayOnlineCount} (${displayOnlineRevenue.toFixed(2)} ₺)`, color: '#8b5cf6' },
+    { label: 'Masa Siparişi', value: `${displayTableCount} (${displayTableRevenue.toFixed(2)} ₺)`, color: '#f59e0b' },
   ];
 
   const renderOrderTable = (orders) => (
@@ -146,15 +157,15 @@ export default function Reports() {
         <Stack direction="row" justifyContent="space-between" alignItems="center"
           onClick={() => setOnlineExpanded(!onlineExpanded)} sx={{ cursor: 'pointer' }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            🌐 Online Siparişler ({onlineOrders.length})
+            🌐 Online Siparişler ({filteredOnlineOrders.length})
           </Typography>
           <IconButton size="small">{onlineExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>
         </Stack>
         <Collapse in={onlineExpanded}>
           <Box sx={{ mt: 1.5 }}>
-            {filterOrders(onlineOrders).length === 0 ? (
+            {filteredOnlineOrders.length === 0 ? (
               <Typography color="text.secondary" variant="body2">Online sipariş bulunmuyor.</Typography>
-            ) : renderOrderTable(filterOrders(onlineOrders))}
+            ) : renderOrderTable(filteredOnlineOrders)}
           </Box>
         </Collapse>
       </Card>
@@ -164,15 +175,15 @@ export default function Reports() {
         <Stack direction="row" justifyContent="space-between" alignItems="center"
           onClick={() => setTableExpanded(!tableExpanded)} sx={{ cursor: 'pointer' }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            🪑 Masa Siparişleri ({tableOrders.length})
+            🪑 Masa Siparişleri ({filteredTableOrders.length})
           </Typography>
           <IconButton size="small">{tableExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>
         </Stack>
         <Collapse in={tableExpanded}>
           <Box sx={{ mt: 1.5 }}>
-            {filterOrders(tableOrders).length === 0 ? (
+            {filteredTableOrders.length === 0 ? (
               <Typography color="text.secondary" variant="body2">Masa siparişi bulunmuyor.</Typography>
-            ) : renderOrderTable(filterOrders(tableOrders))}
+            ) : renderOrderTable(filteredTableOrders)}
           </Box>
         </Collapse>
       </Card>

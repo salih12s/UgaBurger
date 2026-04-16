@@ -98,4 +98,22 @@ const updateProfile = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile };
+const resetPassword = async (req, res) => {
+  try {
+    const { phone, new_password } = req.body;
+    if (!phone || !new_password) return res.status(400).json({ error: 'Telefon ve yeni şifre gerekli' });
+    if (new_password.length < 6) return res.status(400).json({ error: 'Şifre en az 6 karakter olmalı' });
+
+    const user = await User.findOne({ where: { phone } });
+    if (!user) return res.status(404).json({ error: 'Bu telefon numarasına ait hesap bulunamadı' });
+
+    user.password_hash = await bcrypt.hash(new_password, 10);
+    await user.save();
+
+    res.json({ message: 'Şifreniz başarıyla güncellendi' });
+  } catch (err) {
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+};
+
+module.exports = { register, login, getMe, updateProfile, resetPassword };

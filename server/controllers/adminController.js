@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
-const { Order, OrderItem, Product, User, Table, Category, Extra, ProductExtra, Setting } = require('../models');
+const { Order, OrderItem, Product, User, Table, Category, Extra, ProductExtra, Setting, PromoCode } = require('../models');
 const multer = require('multer');
 const path = require('path');
 
@@ -381,6 +381,48 @@ const updateSetting = async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
 };
 
+// --- PROMO CODE MANAGEMENT ---
+const getPromoCodes = async (req, res) => {
+  try {
+    const codes = await PromoCode.findAll({ order: [['created_at', 'DESC']] });
+    res.json(codes);
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
+};
+
+const createPromoCode = async (req, res) => {
+  try {
+    const { code, discount_type, discount_value, min_order_amount, max_uses, is_active, expires_at } = req.body;
+    if (!code || !discount_value) return res.status(400).json({ error: 'Kod ve indirim değeri gerekli' });
+    const existing = await PromoCode.findOne({ where: { code: code.toUpperCase() } });
+    if (existing) return res.status(400).json({ error: 'Bu kod zaten mevcut' });
+    const promo = await PromoCode.create({
+      code: code.toUpperCase(), discount_type: discount_type || 'percentage',
+      discount_value, min_order_amount: min_order_amount || 0,
+      max_uses: max_uses || null, is_active: is_active !== false,
+      expires_at: expires_at || null,
+    });
+    res.status(201).json(promo);
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
+};
+
+const updatePromoCode = async (req, res) => {
+  try {
+    const promo = await PromoCode.findByPk(req.params.id);
+    if (!promo) return res.status(404).json({ error: 'Promosyon kodu bulunamadı' });
+    await promo.update(req.body);
+    res.json(promo);
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
+};
+
+const deletePromoCode = async (req, res) => {
+  try {
+    const promo = await PromoCode.findByPk(req.params.id);
+    if (!promo) return res.status(404).json({ error: 'Promosyon kodu bulunamadı' });
+    await promo.destroy();
+    res.json({ message: 'Promosyon kodu silindi' });
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
+};
+
 module.exports = {
   getAllOrders, updateOrderStatus, createQuickOrder,
   getTables, createTable, updateTable, deleteTable,
@@ -390,4 +432,5 @@ module.exports = {
   upload, uploadImage,
   getDailyReport,
   getSettings, updateSetting,
+  getPromoCodes, createPromoCode, updatePromoCode, deletePromoCode,
 };

@@ -1,4 +1,4 @@
-const { Order, OrderItem, Product, User, Table, Setting } = require('../models');
+const { Order, OrderItem, Product, User, Table, Setting, PromoCode } = require('../models');
 const sequelize = require('../config/db');
 
 const createOrder = async (req, res) => {
@@ -54,7 +54,37 @@ const createOrder = async (req, res) => {
       status: 'pending',
       payment_status: 'pending',
       card_info: card_info || null,
+      promo_code: null,
+      discount_amount: 0,
     }, { transaction: t });
+
+    // Apply promo code if provided
+    const { promo_code } = req.body;
+    if (promo_code) {
+      const promo = await PromoCode.findOne({ where: { code: promo_code.toUpperCase(), is_active: true } });
+      if (promo) {
+        const now = new Date();
+        const notExpired = !promo.expires_at || new Date(promo.expires_at) > now;
+        const notMaxed = !promo.max_uses || promo.used_count < promo.max_uses;
+        const meetsMin = total_amount >= parseFloat(promo.min_order_amount || 0);
+        if (notExpired && notMaxed && meetsMin) {
+          let discount = 0;
+          if (promo.discount_type === 'percentage') {
+            discount = total_amount * parseFloat(promo.discount_value) / 100;
+          } else {
+            discount = parseFloat(promo.discount_value);
+          }
+          discount = Math.min(discount, total_amount);
+          total_amount = total_amount - discount;
+          order.total_amount = total_amount;
+          order.promo_code = promo.code;
+          order.discount_amount = discount;
+          await order.save({ transaction: t });
+          promo.used_count += 1;
+          await promo.save({ transaction: t });
+        }
+      }
+    }
 
     for (const itemData of orderItemsData) {
       await OrderItem.create({ ...itemData, order_id: order.id }, { transaction: t });
@@ -90,4 +120,45 @@ const getMyOrders = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, getMyOrders };
+const validatePromoCode = async (req, res) => {
+  try {
+    const { code, order_total } = req.body;
+    if (!code) return res.status(400).json({ error: 'Promosyon kodu gerekli' });
+
+    const promo = await PromoCode.findOne({ where: { code: code.toUpperCase(), is_active: true } });
+    if (!promo) return res.status(404).json({ error: 'Geçersiz promosyon kodu' });
+
+    const now = new Date();
+    if (promo.expires_at && new Date(promo.expires_at) <= now) {
+      return res.status(400).json({ error: 'Bu promosyon kodunun süresi dolmuş' });
+    }
+    if (promo.max_uses && promo.used_count >= promo.max_uses) {
+      return res.status(400).json({ error: 'Bu promosyon kodu kullanım limitine ulaşmış' });
+    }
+    const total = parseFloat(order_total || 0);
+    if (total < parseFloat(promo.min_order_amount || 0)) {
+      return res.status(400).json({ error: `Minimum sipariş tutarı: ${parseFloat(promo.min_order_amount).toFixed(2)} TL` });
+    }
+
+    let discount = 0;
+    if (promo.discount_type === 'percentage') {
+      discount = total * parseFloat(promo.discount_value) / 100;
+    } else {
+      discount = parseFloat(promo.discount_value);
+    }
+    discount = Math.min(discount, total);
+
+    res.json({
+      valid: true,
+      code: promo.code,
+      discount_type: promo.discount_type,
+      discount_value: parseFloat(promo.discount_value),
+      discount_amount: parseFloat(discount.toFixed(2)),
+      new_total: parseFloat((total - discount).toFixed(2)),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+};
+
+module.exports = { createOrder, getMyOrders, validatePromoCode };

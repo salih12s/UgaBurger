@@ -24,6 +24,8 @@ const Order = sequelize.define('Order', {
   card_info: { type: DataTypes.JSON, defaultValue: null },
   customer_name: { type: DataTypes.STRING(100), allowNull: true, defaultValue: null },
   customer_phone: { type: DataTypes.STRING(20), allowNull: true, defaultValue: null },
+  promo_code: { type: DataTypes.STRING(50), allowNull: true, defaultValue: null },
+  discount_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: true, defaultValue: 0 },
 }, { tableName: 'orders' });
 
 module.exports = Order;

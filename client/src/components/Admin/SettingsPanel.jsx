@@ -3,9 +3,11 @@ import api, { getImageUrl } from '../../api/api';
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Card, TextField, Button, Switch, Stack, Checkbox, Slider,
-  Accordion, AccordionSummary, AccordionDetails, Select, MenuItem, FormControlLabel, Fab
+  Accordion, AccordionSummary, AccordionDetails, Select, MenuItem, FormControlLabel, Fab,
+  Table as MuiTable, TableHead, TableBody, TableRow, TableCell, IconButton, Chip
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DeleteIcon from '@mui/icons-material/Delete';
 import 'leaflet/dist/leaflet.css';
 
 const DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
@@ -36,6 +38,42 @@ export default function SettingsPanel() {
       try { setZones(JSON.parse(settings.delivery_zones)); } catch { setZones([]); }
     }
   }, [settings.delivery_zones]);
+
+  // Promo codes
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percentage', discount_value: '', min_order_amount: '', max_uses: '', expires_at: '' });
+  useEffect(() => { api.get('/admin/promo-codes').then(res => setPromoCodes(res.data)).catch(() => {}); }, []);
+
+  const addPromo = async () => {
+    if (!newPromo.code || !newPromo.discount_value) { toast.error('Kod ve indirim değeri gerekli'); return; }
+    try {
+      const res = await api.post('/admin/promo-codes', {
+        ...newPromo,
+        discount_value: parseFloat(newPromo.discount_value),
+        min_order_amount: newPromo.min_order_amount ? parseFloat(newPromo.min_order_amount) : 0,
+        max_uses: newPromo.max_uses ? parseInt(newPromo.max_uses) : null,
+        expires_at: newPromo.expires_at || null,
+      });
+      setPromoCodes(prev => [res.data, ...prev]);
+      setNewPromo({ code: '', discount_type: 'percentage', discount_value: '', min_order_amount: '', max_uses: '', expires_at: '' });
+      toast.success('Promosyon kodu oluşturuldu');
+    } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
+  };
+
+  const togglePromo = async (id, is_active) => {
+    try {
+      await api.put(`/admin/promo-codes/${id}`, { is_active: !is_active });
+      setPromoCodes(prev => prev.map(p => p.id === id ? { ...p, is_active: !is_active } : p));
+    } catch { toast.error('Hata'); }
+  };
+
+  const deletePromo = async (id) => {
+    try {
+      await api.delete(`/admin/promo-codes/${id}`);
+      setPromoCodes(prev => prev.filter(p => p.id !== id));
+      toast.success('Silindi');
+    } catch { toast.error('Hata'); }
+  };
 
   const s = (key, def = '') => settings[key] || def;
   const upd = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
@@ -371,7 +409,58 @@ export default function SettingsPanel() {
         </Stack>
       </Section>
 
-      {/* 9. KVKK & Hukuki Metinler */}
+      {/* 9. Promosyon Kodları */}
+      <Section icon="🎟️" title="Promosyon Kodları">
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Müşterilerin sipariş sırasında kullanabileceği indirim kodları oluşturun.</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 1.5, mb: 2, p: 2, bgcolor: '#f9fafb', borderRadius: 2 }}>
+          <TextField size="small" label="Kod" value={newPromo.code} onChange={e => setNewPromo(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="YENI10" />
+          <Select size="small" value={newPromo.discount_type} onChange={e => setNewPromo(p => ({ ...p, discount_type: e.target.value }))}>
+            <MenuItem value="percentage">Yüzde (%)</MenuItem>
+            <MenuItem value="fixed">Sabit (TL)</MenuItem>
+          </Select>
+          <TextField size="small" label={newPromo.discount_type === 'percentage' ? 'İndirim (%)' : 'İndirim (TL)'} type="number" value={newPromo.discount_value} onChange={e => setNewPromo(p => ({ ...p, discount_value: e.target.value }))} />
+          <TextField size="small" label="Min. Sipariş (TL)" type="number" value={newPromo.min_order_amount} onChange={e => setNewPromo(p => ({ ...p, min_order_amount: e.target.value }))} />
+          <TextField size="small" label="Maks. Kullanım" type="number" value={newPromo.max_uses} onChange={e => setNewPromo(p => ({ ...p, max_uses: e.target.value }))} helperText="Boş = sınırsız" />
+          <TextField size="small" label="Son Kullanma" type="date" value={newPromo.expires_at} onChange={e => setNewPromo(p => ({ ...p, expires_at: e.target.value }))} InputLabelProps={{ shrink: true }} helperText="Boş = süresiz" />
+        </Box>
+        <Button variant="contained" size="small" onClick={addPromo} sx={{ mb: 2, fontWeight: 700 }}>+ Kod Oluştur</Button>
+
+        {promoCodes.length > 0 && (
+          <MuiTable size="small">
+            <TableHead>
+              <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8', fontSize: 12 } }}>
+                <TableCell>Kod</TableCell>
+                <TableCell>İndirim</TableCell>
+                <TableCell>Min. Sipariş</TableCell>
+                <TableCell>Kullanım</TableCell>
+                <TableCell>Son Kullanma</TableCell>
+                <TableCell>Durum</TableCell>
+                <TableCell></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {promoCodes.map(p => (
+                <TableRow key={p.id} hover>
+                  <TableCell sx={{ fontWeight: 700 }}>{p.code}</TableCell>
+                  <TableCell>{p.discount_type === 'percentage' ? `%${parseFloat(p.discount_value)}` : `${parseFloat(p.discount_value).toFixed(2)} TL`}</TableCell>
+                  <TableCell>{parseFloat(p.min_order_amount || 0).toFixed(2)} TL</TableCell>
+                  <TableCell>{p.used_count}{p.max_uses ? `/${p.max_uses}` : ''}</TableCell>
+                  <TableCell>{p.expires_at ? new Date(p.expires_at).toLocaleDateString('tr-TR') : 'Süresiz'}</TableCell>
+                  <TableCell>
+                    <Chip label={p.is_active ? 'Aktif' : 'Pasif'} size="small" onClick={() => togglePromo(p.id, p.is_active)}
+                      sx={{ fontWeight: 600, fontSize: 11, cursor: 'pointer', bgcolor: p.is_active ? '#dcfce7' : '#fee2e2', color: p.is_active ? '#16a34a' : '#dc2626' }} />
+                  </TableCell>
+                  <TableCell>
+                    <IconButton size="small" color="error" onClick={() => deletePromo(p.id)}><DeleteIcon fontSize="small" /></IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </MuiTable>
+        )}
+      </Section>
+
+      {/* 10. KVKK & Hukuki Metinler */}
       <Section icon="📜" title="KVKK &amp; Hukuki Metinler">
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Kayıt ve ödeme sırasında kullanıcılara gösterilecek yasal metinler.</Typography>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>✅ KVKK AYDINLATMA METNİ</Typography>
