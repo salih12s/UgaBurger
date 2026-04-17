@@ -42,6 +42,7 @@ REM Client .env.production dosyasini production olarak birak
 (
 echo # API URL - Production
 echo VITE_API_URL=https://ugaburger.com
+echo VITE_GOOGLE_CLIENT_ID=631573681169-5c6j1gmko7cbrm1uce7uuqo5bi7bkkid.apps.googleusercontent.com
 ) > client\.env.production
 
 echo.

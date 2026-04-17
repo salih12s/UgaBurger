@@ -20,7 +20,7 @@ echo # SMTP Configuration
 echo SMTP_HOST=smtp.gmail.com
 echo SMTP_PORT=587
 echo SMTP_USER=ugaburger33@gmail.com
-echo SMTP_PASS=YOUR_APP_PASSWORD_HERE
+echo SMTP_PASS=clkwyrzjtyjbiedc
 echo.
 echo # Google OAuth
 echo GOOGLE_CLIENT_ID=631573681169-5c6j1gmko7cbrm1uce7uuqo5bi7bkkid.apps.googleusercontent.com
