@@ -131,21 +131,68 @@ const forgotPassword = async (req, res) => {
       from: `"UGA BURGER" <${process.env.SMTP_USER || 'no-reply@ugaburger.com'}>`,
       to: email,
       subject: 'Şifre Sıfırlama - UGA BURGER',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #dc2626; text-align: center;">UGA BURGER</h2>
-          <h3 style="text-align: center;">Şifre Sıfırlama</h3>
-          <p>Merhaba,</p>
-          <p>Hesabınız için şifre sıfırlama talebinde bulunuldu. Şifrenizi sıfırlamak için aşağıdaki butona tıklayın:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetUrl}" style="background-color: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">Şifremi Sıfırla</a>
-          </div>
-          <p style="color: #888; font-size: 13px;">Bu link 1 saat içinde geçerliliğini yitirecektir.</p>
-          <p style="color: #888; font-size: 13px;">Bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="color: #aaa; font-size: 12px; text-align: center;">© ${new Date().getFullYear()} UGA BURGER</p>
-        </div>
-      `,
+      html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+<tr><td align="center">
+<table role="presentation" width="500" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;max-width:500px;width:100%;">
+
+  <!-- Header -->
+  <tr>
+    <td style="background-color:#dc2626;padding:24px;text-align:center;">
+      <span style="font-size:28px;">🍔</span>
+      <h1 style="color:#ffffff;margin:8px 0 0;font-size:24px;">UGA BURGER</h1>
+    </td>
+  </tr>
+
+  <!-- Content -->
+  <tr>
+    <td style="padding:32px 24px;">
+      <h2 style="color:#333333;text-align:center;margin:0 0 16px;">Şifre Sıfırlama</h2>
+      <p style="color:#555555;font-size:15px;line-height:1.6;">Merhaba,</p>
+      <p style="color:#555555;font-size:15px;line-height:1.6;">Hesabınız için şifre sıfırlama talebinde bulunuldu. Şifrenizi sıfırlamak için aşağıdaki butona tıklayın:</p>
+
+      <!-- Button -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;">
+        <tr>
+          <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background-color:#16a34a;border-radius:6px;">
+                  <a href="${resetUrl}" target="_blank" style="display:inline-block;padding:14px 36px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;letter-spacing:0.5px;">Şifremi Sıfırla</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <p style="color:#999999;font-size:13px;line-height:1.5;">Bu link 1 saat içinde geçerliliğini yitirecektir.</p>
+      <p style="color:#999999;font-size:13px;line-height:1.5;">Buton çalışmıyorsa aşağıdaki linki tarayıcınıza yapıştırın:</p>
+      <p style="color:#16a34a;font-size:12px;word-break:break-all;line-height:1.4;">${resetUrl}</p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+        <tr><td style="border-top:1px solid #eeeeee;padding-top:16px;">
+          <p style="color:#999999;font-size:13px;">Bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
+        </td></tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background-color:#f9f9f9;padding:16px;text-align:center;">
+      <p style="color:#aaaaaa;font-size:12px;margin:0;">&copy; ${new Date().getFullYear()} UGA BURGER - Tüm hakları saklıdır.</p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`,
     });
 
     res.json({ message: 'Şifre sıfırlama linki e-posta adresinize gönderildi' });
