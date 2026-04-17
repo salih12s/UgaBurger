@@ -22,11 +22,8 @@ export default function Footer() {
 
   return (
     <>
-      <Box component="footer" sx={{ textAlign: 'center', py: 2.5, color: '#888', fontSize: 13, bgcolor: '#fff', borderTop: '1px solid #eee', mt: 5 }}>
-        <Typography variant="body2" color="text.secondary">
-          © {new Date().getFullYear()} {siteName} - Tüm hakları saklıdır.
-        </Typography>
-        <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 1 }}>
+      <Box component="footer" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 2, py: 2.5, color: '#888', fontSize: 13, bgcolor: '#fff', borderTop: '1px solid #eee', mt: 5 }}>
+        <Stack direction="row" spacing={2}>
           {legalItems.map(item => (
             settings[item.key] && (
               <Typography key={item.key} variant="caption" onClick={() => setLegalDialog(item)}
@@ -36,6 +33,9 @@ export default function Footer() {
             )
           ))}
         </Stack>
+        <Typography variant="body2" color="text.secondary">
+          © {new Date().getFullYear()} {siteName} - Tüm hakları saklıdır.
+        </Typography>
       </Box>
 
       <Dialog open={!!legalDialog} onClose={() => setLegalDialog(null)} maxWidth="sm" fullWidth>

@@ -94,15 +94,10 @@ export default function TableOrders() {
   };
 
   const addToCart = (product, extras) => {
-    const extrasKey = extras.map(e => `${e.id}:${e.quantity || 1}`).sort().join(',');
-    setCartItems(prev => {
-      const existing = prev.find(i => i.product_id === product.id && i._extrasKey === extrasKey);
-      if (existing) return prev.map(i => (i.product_id === product.id && i._extrasKey === extrasKey) ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, {
-        product_id: product.id, name: product.name, price: product.price,
-        quantity: 1, extras, _extrasKey: extrasKey, isFree: false
-      }];
-    });
+    setCartItems(prev => [...prev, {
+      product_id: product.id, name: product.name, price: product.price,
+      quantity: 1, extras, isFree: false
+    }]);
   };
 
   const updateCartQty = (index, qty) => {
@@ -182,11 +177,13 @@ export default function TableOrders() {
   <div class="center" style="font-size:${rFontPx - 3}px;margin-top:2px">--- SON ---</div>
 </body></html>`;
 
-    const win = window.open('', '_blank', 'width=320,height=600');
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    win.print();
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+    setTimeout(() => iframe.contentWindow.print(), 200);
   };
 
   const submitQuickOrder = async () => {
@@ -217,6 +214,9 @@ export default function TableOrders() {
     <Box sx={{ overflow: 'hidden' }}>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>Masa Siparişleri / Hızlı Sipariş</Typography>
 
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 320px' }, gap: 2 }}>
+        {/* Sol Taraf: Masa Yönetimi + Hızlı Sipariş */}
+        <Box sx={{ minWidth: 0 }}>
       {/* Table Management */}
       <Card sx={{ p: 2.5, mb: 3 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>Masa Yönetimi</Typography>
@@ -234,8 +234,6 @@ export default function TableOrders() {
 
       {/* Quick Order */}
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>Hızlı Sipariş</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 320px' }, gap: 2 }}>
-        <Box sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 2, '&::-webkit-scrollbar': { display: 'none' } }}>
             <Chip label="Tümü" onClick={() => setActiveCategory(null)} variant={activeCategory === null ? 'filled' : 'outlined'}
               sx={{ fontWeight: 500, ...(activeCategory === null && { bgcolor: '#dc2626', color: '#fff' }) }} />

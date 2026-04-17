@@ -55,7 +55,7 @@ export default function MenuPage() {
           icon={<Typography sx={{ fontSize: 20 }}>{settings.closed_banner_icon || '🔴'}</Typography>}
           action={<Button color="inherit" size="small" variant="outlined" onClick={() => navigate('/contact')} sx={{ borderRadius: 20, whiteSpace: 'nowrap' }}>İletişim & Detay ›</Button>}
           sx={{ mb: 3, borderRadius: 3, bgcolor: settings.closed_banner_color || '#3b82f6', '& .MuiAlert-icon': { color: '#fff' } }}>
-          {settings.closed_message || 'Şuanda online sipariş hizmeti verilmemektedir.'} Telefon Siparişi İçin: {settings.store_phone || '05301257088'}
+          {settings.closed_message || 'Şuanda online sipariş hizmeti verilmemektedir.'}
         </Alert>
       )}
 

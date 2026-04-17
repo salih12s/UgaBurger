@@ -6,12 +6,13 @@ const User = sequelize.define('User', {
   first_name: { type: DataTypes.STRING(100), allowNull: false },
   last_name: { type: DataTypes.STRING(100), allowNull: false },
   email: { type: DataTypes.STRING(255), allowNull: false },
-  phone: { type: DataTypes.STRING(20), allowNull: false, unique: true },
-  password_hash: { type: DataTypes.STRING(255), allowNull: false },
+  phone: { type: DataTypes.STRING(20), allowNull: true, unique: true },
+  password_hash: { type: DataTypes.STRING(255), allowNull: true },
   role: { type: DataTypes.ENUM('customer', 'admin'), defaultValue: 'customer' },
   addresses: { type: DataTypes.TEXT, allowNull: true, defaultValue: '[]' },
-  reset_code: { type: DataTypes.STRING(6), allowNull: true, defaultValue: null },
-  reset_code_expires: { type: DataTypes.DATE, allowNull: true, defaultValue: null },
+  google_id: { type: DataTypes.STRING(255), allowNull: true, unique: true },
+  reset_token: { type: DataTypes.STRING(255), allowNull: true, defaultValue: null },
+  reset_token_expires: { type: DataTypes.DATE, allowNull: true, defaultValue: null },
 }, { tableName: 'users' });
 
 module.exports = User;

@@ -95,6 +95,7 @@ export default function Reports() {
           <TableCell>Ödeme</TableCell>
           <TableCell>Durum</TableCell>
           <TableCell>Tutar</TableCell>
+          <TableCell>İndirim</TableCell>
           <TableCell>Tarih</TableCell>
         </TableRow>
       </TableHead>
@@ -122,6 +123,7 @@ export default function Reports() {
             <TableCell><Typography variant="caption">{paymentLabel(o.payment_method, o.order_type)}</Typography></TableCell>
             <TableCell><Chip label={statusLabels[o.status] || o.status} size="small" sx={{ fontSize: 11, fontWeight: 600 }} /></TableCell>
             <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{parseFloat(o.total_amount).toFixed(2)} ₺</TableCell>
+            <TableCell sx={{ color: '#dc2626', fontWeight: 600, whiteSpace: 'nowrap' }}>{parseFloat(o.discount_amount || 0) > 0 ? `-${parseFloat(o.discount_amount).toFixed(2)} ₺` : '-'}</TableCell>
             <TableCell><Typography variant="caption">{formatDate(o.created_at)}</Typography></TableCell>
           </TableRow>
         ))}

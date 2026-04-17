@@ -4,7 +4,34 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Box, Card, Typography, TextField, Button, Divider, FormControlLabel, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
+import { useGoogleLogin } from '@react-oauth/google';
 import api from '../../api/api';
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+function GoogleRegisterBtn() {
+  const { googleAuth } = useAuth();
+  const navigate = useNavigate();
+  const handleGoogleClick = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const user = await googleAuth(tokenResponse.access_token);
+        toast.success('Google ile kayıt başarılı!');
+        navigate(user.role === 'admin' ? '/admin' : '/menu');
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Google kayıt hatası');
+      }
+    },
+    onError: () => toast.error('Google kayıt hatası'),
+  });
+  return (
+    <Button fullWidth variant="outlined" startIcon={<GoogleIcon />}
+      onClick={() => handleGoogleClick()}
+      sx={{ color: '#333', borderColor: '#ddd', fontWeight: 600, py: 1.2 }}>
+      Google ile Kayıt Ol
+    </Button>
+  );
+}
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', password: '', password2: '' });
@@ -73,12 +100,12 @@ export default function RegisterPage() {
             {loading ? 'Kayıt yapılıyor...' : 'Kayıt Ol'}
           </Button>
         </form>
-        <Divider sx={{ my: 2 }} />
-        <Button fullWidth variant="outlined" startIcon={<GoogleIcon />}
-          onClick={() => toast('Google kayıt yakında aktif olacak')}
-          sx={{ color: '#333', borderColor: '#ddd', fontWeight: 600, py: 1.2 }}>
-          Google ile Kayıt Ol
-        </Button>
+        {googleClientId && googleClientId !== 'YOUR_GOOGLE_CLIENT_ID_HERE' && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <GoogleRegisterBtn />
+          </>
+        )}
         <Typography variant="body2" sx={{ textAlign: 'center', mt: 2.5, color: '#666' }}>
           Zaten hesabın var mı? <Typography component={Link} to="/login" sx={{ color: '#dc2626', fontWeight: 600, textDecoration: 'none' }}>Giriş Yap</Typography>
         </Typography>

@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { CircularProgress, Box } from '@mui/material';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import theme from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -12,6 +13,7 @@ import HomePage from './components/Home/HomePage';
 import ContactPage from './components/Contact/ContactPage';
 import LoginPage from './components/Auth/LoginPage';
 import RegisterPage from './components/Auth/RegisterPage';
+import ResetPasswordPage from './components/Auth/ResetPasswordPage';
 import MenuPage from './components/Menu/MenuPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import AdminLayout from './components/Admin/AdminLayout';
@@ -32,6 +34,7 @@ function AppRoutes() {
       <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
       <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/menu'} /> : <><Navbar /><LoginPage /><Footer /></>} />
       <Route path="/register" element={user ? <Navigate to="/menu" /> : <><Navbar /><RegisterPage /><Footer /></>} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
       <Route path="/profile" element={user ? <><Navbar /><ProfilePage /><Footer /></> : <Navigate to="/login" />} />
       <Route path="/admin/*" element={<ProtectedAdmin><AdminLayout /></ProtectedAdmin>} />
@@ -39,8 +42,10 @@ function AppRoutes() {
   );
 }
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
 export default function App() {
-  return (
+  const content = (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
@@ -53,4 +58,6 @@ export default function App() {
       </BrowserRouter>
     </ThemeProvider>
   );
+
+  return <GoogleOAuthProvider clientId={googleClientId || ''}>{content}</GoogleOAuthProvider>;
 }

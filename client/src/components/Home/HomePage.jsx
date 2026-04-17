@@ -5,6 +5,34 @@ import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import PlaceIcon from '@mui/icons-material/Place';
 import GoogleIcon from '@mui/icons-material/Google';
 import api, { getImageUrl } from '../../api/api';
+import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
+import { useGoogleLogin } from '@react-oauth/google';
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+function GoogleHomeBtn() {
+  const { googleAuth } = useAuth();
+  const navigate = useNavigate();
+  const handleGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const user = await googleAuth(tokenResponse.access_token);
+        toast.success('Google ile giriş başarılı!');
+        navigate(user.role === 'admin' ? '/admin' : '/menu');
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Google giriş hatası');
+      }
+    },
+    onError: () => toast.error('Google giriş hatası'),
+  });
+  return (
+    <Button onClick={() => handleGoogle()} variant="contained" startIcon={<GoogleIcon />}
+      sx={{ bgcolor: '#fff', color: '#333', borderRadius: 30, px: 4, py: 1.5, fontWeight: 600, fontSize: 15, mb: 2.5, boxShadow: '0 2px 12px rgba(0,0,0,0.2)', '&:hover': { bgcolor: '#f5f5f5' } }}>
+      Google ile Hızlı Giriş
+    </Button>
+  );
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -48,10 +76,7 @@ export default function HomePage() {
           </Button>
         </Stack>
 
-        <Button onClick={() => {}} variant="contained" startIcon={<GoogleIcon />}
-          sx={{ bgcolor: '#fff', color: '#333', borderRadius: 30, px: 4, py: 1.5, fontWeight: 600, fontSize: 15, mb: 2.5, boxShadow: '0 2px 12px rgba(0,0,0,0.2)', '&:hover': { bgcolor: '#f5f5f5' } }}>
-          Google ile Hızlı Giriş
-        </Button>
+        {googleClientId && googleClientId !== 'YOUR_GOOGLE_CLIENT_ID_HERE' && <GoogleHomeBtn />}
 
         <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ ml: 36 }}>
           <Typography component={Link} to="/login" sx={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 3, '&:hover': { color: '#fff' } }}>

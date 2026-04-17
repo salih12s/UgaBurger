@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Box, Card, Typography, Button, Stack, Table, TableBody, TableRow, TableCell, Avatar, CircularProgress } from '@mui/material';
 import PlaceIcon from '@mui/icons-material/Place';
 import PhoneIcon from '@mui/icons-material/Phone';
+import EmailIcon from '@mui/icons-material/Email';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../api/api';
@@ -20,6 +21,7 @@ export default function ContactPage() {
 
   const address = s('contact_address', 'Uga Burger, inönü mah. Yenişehir/Mersin');
   const phone = s('contact_phone', s('store_phone', '05301257088'));
+  const email = s('contact_email', 'bilgi@ugaburger.com');
   const lat = s('contact_lat', '36.807804');
   const lng = s('contact_lng', '34.637124');
 
@@ -46,6 +48,14 @@ export default function ContactPage() {
             <Box>
               <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Telefon</Typography>
               <Typography variant="body2" color="text.secondary">{phone}</Typography>
+            </Box>
+          </Stack>
+
+          <Stack direction="row" spacing={2} alignItems="flex-start">
+            <Avatar sx={{ bgcolor: '#dbeafe', color: '#3b82f6', width: 44, height: 44 }}><EmailIcon /></Avatar>
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 15 }}>E-posta</Typography>
+              <Typography variant="body2" color="text.secondary">{email}</Typography>
             </Box>
           </Stack>
 

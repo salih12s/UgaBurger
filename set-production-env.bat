@@ -15,17 +15,28 @@ echo.
 echo # Server Configuration
 echo PORT=3000
 echo CLIENT_URL=https://mintcream-wasp-984519.hostingersite.com
+echo.
+echo # SMTP Configuration
+echo SMTP_HOST=smtp.gmail.com
+echo SMTP_PORT=587
+echo SMTP_USER=ugaburger33@gmail.com
+echo SMTP_PASS=YOUR_APP_PASSWORD_HERE
+echo.
+echo # Google OAuth
+echo GOOGLE_CLIENT_ID=631573681169-5c6j1gmko7cbrm1uce7uuqo5bi7bkkid.apps.googleusercontent.com
 ) > .env
 
 REM Client .env dosyalarini ayarla
 (
 echo # API URL - Local Development ^(bos = Vite proxy kullanir^)
 echo VITE_API_URL=
+echo VITE_GOOGLE_CLIENT_ID=631573681169-5c6j1gmko7cbrm1uce7uuqo5bi7bkkid.apps.googleusercontent.com
 ) > client\.env.development
 
 (
 echo # API URL - Production
 echo VITE_API_URL=https://ugaburger-production.up.railway.app
+echo VITE_GOOGLE_CLIENT_ID=631573681169-5c6j1gmko7cbrm1uce7uuqo5bi7bkkid.apps.googleusercontent.com
 ) > client\.env.production
 
 echo.

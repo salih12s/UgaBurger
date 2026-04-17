@@ -63,25 +63,34 @@ const createOrder = async (req, res) => {
     if (promo_code) {
       const promo = await PromoCode.findOne({ where: { code: promo_code.toUpperCase(), is_active: true } });
       if (promo) {
-        const now = new Date();
-        const notExpired = !promo.expires_at || new Date(promo.expires_at) > now;
-        const notMaxed = !promo.max_uses || promo.used_count < promo.max_uses;
-        const meetsMin = total_amount >= parseFloat(promo.min_order_amount || 0);
-        if (notExpired && notMaxed && meetsMin) {
-          let discount = 0;
-          if (promo.discount_type === 'percentage') {
-            discount = total_amount * parseFloat(promo.discount_value) / 100;
-          } else {
-            discount = parseFloat(promo.discount_value);
+        // Kullanıcı bu kodu daha önce kullandı mı kontrol et
+        const alreadyUsed = await Order.findOne({
+          where: { user_id: req.user.id, promo_code: promo.code },
+          transaction: t,
+        });
+        if (alreadyUsed) {
+          // Promo uygulamadan devam et
+        } else {
+          const now = new Date();
+          const notExpired = !promo.expires_at || new Date(promo.expires_at) > now;
+          const notMaxed = !promo.max_uses || promo.used_count < promo.max_uses;
+          const meetsMin = total_amount >= parseFloat(promo.min_order_amount || 0);
+          if (notExpired && notMaxed && meetsMin) {
+            let discount = 0;
+            if (promo.discount_type === 'percentage') {
+              discount = total_amount * parseFloat(promo.discount_value) / 100;
+            } else {
+              discount = parseFloat(promo.discount_value);
+            }
+            discount = Math.min(discount, total_amount);
+            total_amount = total_amount - discount;
+            order.total_amount = total_amount;
+            order.promo_code = promo.code;
+            order.discount_amount = discount;
+            await order.save({ transaction: t });
+            promo.used_count += 1;
+            await promo.save({ transaction: t });
           }
-          discount = Math.min(discount, total_amount);
-          total_amount = total_amount - discount;
-          order.total_amount = total_amount;
-          order.promo_code = promo.code;
-          order.discount_amount = discount;
-          await order.save({ transaction: t });
-          promo.used_count += 1;
-          await promo.save({ transaction: t });
         }
       }
     }
@@ -127,6 +136,12 @@ const validatePromoCode = async (req, res) => {
 
     const promo = await PromoCode.findOne({ where: { code: code.toUpperCase(), is_active: true } });
     if (!promo) return res.status(404).json({ error: 'Geçersiz promosyon kodu' });
+
+    // Kullanıcı bu kodu daha önce kullandı mı?
+    if (req.user) {
+      const alreadyUsed = await Order.findOne({ where: { user_id: req.user.id, promo_code: promo.code } });
+      if (alreadyUsed) return res.status(400).json({ error: 'Bu promosyon kodunu daha önce kullandınız' });
+    }
 
     const now = new Date();
     if (promo.expires_at && new Date(promo.expires_at) <= now) {

@@ -29,6 +29,7 @@ export default function OrderManagement() {
   const [settings, setSettings] = useState({});
   const [cancelConfirm, setCancelConfirm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(50);
 
   const fetchOrders = useCallback(() => {
     api.get('/admin/orders').then(res => setOrders(res.data));
@@ -149,11 +150,13 @@ export default function OrderManagement() {
   <div class="center" style="font-size:${rFontPx - 3}px;margin-top:2px">--- SON ---</div>
 </body></html>`;
 
-    const win = window.open('', '_blank', 'width=320,height=600');
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    win.print();
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+    setTimeout(() => iframe.contentWindow.print(), 200);
   };
 
   return (
@@ -163,7 +166,7 @@ export default function OrderManagement() {
       <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 2, '&::-webkit-scrollbar': { display: 'none' } }}>
         {Object.entries(statusLabels).map(([key, label]) => (
           <Chip key={key} label={`${label} (${statusCounts[key] || 0})`}
-            onClick={() => setActiveStatus(key)}
+            onClick={() => { setActiveStatus(key); setVisibleCount(50); }}
             variant={activeStatus === key ? 'filled' : 'outlined'}
             sx={{ fontWeight: 500,
               ...(activeStatus === key && { bgcolor: statusColors[key], color: '#fff' }),
@@ -179,7 +182,7 @@ export default function OrderManagement() {
         {filteredOrders.length === 0 ? (
           <Typography color="text.secondary" sx={{ p: 2.5 }}>Bu durumda sipariş bulunmuyor.</Typography>
         ) : (
-          filteredOrders.map(order => {
+          filteredOrders.slice(0, visibleCount).map(order => {
             return (
             <Card key={order.id} sx={{ p: 2.5 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
@@ -235,6 +238,16 @@ export default function OrderManagement() {
               </Stack>
 
               <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#dc2626', mb: 1.5 }}>{parseFloat(order.total_amount).toFixed(2)} TL</Typography>
+              {order.promo_code && (
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                  <Chip label={`Kupon: ${order.promo_code}`} size="small" sx={{ fontSize: 11, fontWeight: 600, bgcolor: '#fef3c7', color: '#92400e' }} />
+                  {parseFloat(order.discount_amount || 0) > 0 && (
+                    <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700 }}>
+                      İndirim: -{parseFloat(order.discount_amount).toFixed(2)} TL
+                    </Typography>
+                  )}
+                </Stack>
+              )}
               <Stack direction="row" spacing={1}>
                 {nextStatus[order.status] && (
                   <Button size="small" variant="contained" color="success" onClick={() => handleStatusChange(order.id, nextStatus[order.status], order)}
@@ -257,6 +270,14 @@ export default function OrderManagement() {
           );})
         )}
       </Box>
+
+      {filteredOrders.length > visibleCount && (
+        <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Button variant="outlined" onClick={() => setVisibleCount(prev => prev + 50)} sx={{ fontWeight: 600 }}>
+            Daha Fazla Göster ({filteredOrders.length - visibleCount} sipariş daha)
+          </Button>
+        </Box>
+      )}
 
       {/* İptal Onay Modalı */}
       <Dialog open={!!cancelConfirm} onClose={() => setCancelConfirm(null)} maxWidth="xs" fullWidth>

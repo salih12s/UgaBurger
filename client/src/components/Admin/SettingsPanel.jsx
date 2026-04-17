@@ -101,6 +101,7 @@ export default function SettingsPanel() {
       ['receipt_show_prices', s('receipt_show_prices','true')],
       ['receipt_show_total', s('receipt_show_total','true')],
       ['contact_address', s('contact_address')], ['contact_phone', s('contact_phone')],
+      ['contact_email', s('contact_email', 'bilgi@ugaburger.com')],
       ['contact_lat', s('contact_lat','36.807804')], ['contact_lng', s('contact_lng','34.637124')],
       ['online_order_active', s('online_order_active','true')],
       ['kvkk_text', s('kvkk_text')],
@@ -299,20 +300,25 @@ export default function SettingsPanel() {
           </Box>
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 600, textAlign: 'center', display: 'block', mb: 1 }}>CANLI ÖNİZLEME (80MM)</Typography>
-            <Card variant="outlined" sx={{ p: 2, fontFamily: 'Courier New, monospace', fontSize: receiptFontPx, maxWidth: 300, mx: 'auto' }}>
-              <Box sx={{ textAlign: 'center', fontWeight: 700 }}>{s('receipt_title', 'MUSATTI BURGER')}</Box>
-              {s('receipt_show_order_no', 'true') === 'true' && <Box sx={{ textAlign: 'center', fontWeight: 700, fontSize: receiptFontPx + 4 }}>#1024</Box>}
+            <Card variant="outlined" sx={{ p: 2, fontFamily: 'Courier New, monospace', fontSize: receiptFontPx, maxWidth: 300, mx: 'auto', bgcolor: '#fff' }}>
+              <Box sx={{ textAlign: 'center', fontWeight: 700, fontSize: receiptFontPx + 6, mb: 0.3 }}>{s('receipt_title', 'MUSATTI BURGER')}</Box>
+              <Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} />
+              {s('receipt_show_order_no', 'true') === 'true' && <Box sx={{ textAlign: 'center', fontWeight: 700, fontSize: receiptFontPx + 2 }}>#1024</Box>}
               {s('receipt_show_date', 'true') === 'true' && <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2 }}>30.01.2026{s('receipt_show_time', 'true') === 'true' ? ' 14:30' : ''}</Box>}
-              {s('receipt_show_table', 'true') === 'true' && <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2 }}>MASA: BAHÇE-4</Box>}
+              {s('receipt_show_table', 'true') === 'true' && (<><Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} /><Box sx={{ fontSize: receiptFontPx - 1 }}>MASA: BAHÇE-4</Box></>)}
+              <Box sx={{ fontSize: receiptFontPx - 1 }}>Müşteri: Ahmet Yılmaz</Box>
+              <Box sx={{ fontSize: receiptFontPx - 1 }}>Tel: 05321234567</Box>
               <Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} />
-              <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontSize: receiptFontPx, fontWeight: 600 }}>2x Cheeseburger</Typography>{s('receipt_show_prices', 'true') === 'true' && <Typography sx={{ fontSize: receiptFontPx }}>₺120.00</Typography>}</Stack>
-              <Typography sx={{ fontSize: receiptFontPx - 2, color: '#8b5cf6', pl: 1 }}>+ Ekstra Peynir</Typography>
-              <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontSize: receiptFontPx, fontWeight: 600 }}>1x Kola (330ml)</Typography>{s('receipt_show_prices', 'true') === 'true' && <Typography sx={{ fontSize: receiptFontPx }}>₺15.00</Typography>}</Stack>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography sx={{ fontSize: receiptFontPx }}>2x Cheeseburger</Typography>{s('receipt_show_prices', 'true') === 'true' && <Typography sx={{ fontSize: receiptFontPx }}>120.00 TL</Typography>}</Box>
+              <Typography sx={{ fontSize: receiptFontPx - 2, pl: 1 }}>+ Ekstra Peynir</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography sx={{ fontSize: receiptFontPx }}>1x Kola (330ml)</Typography>{s('receipt_show_prices', 'true') === 'true' && <Typography sx={{ fontSize: receiptFontPx }}>15.00 TL</Typography>}</Box>
               <Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} />
-              {s('receipt_show_total', 'true') === 'true' && <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontSize: receiptFontPx + 2, fontWeight: 700 }}>TOPLAM:</Typography><Typography sx={{ fontSize: receiptFontPx + 2, fontWeight: 700 }}>₺135.00</Typography></Stack>}
+              {s('receipt_show_total', 'true') === 'true' && (<><Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography sx={{ fontSize: receiptFontPx + 4, fontWeight: 700 }}>TOPLAM:</Typography><Typography sx={{ fontSize: receiptFontPx + 4, fontWeight: 700 }}>135.00 TL</Typography></Box><Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} /></>)}
+              <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2 }}>Ödeme: Nakit</Box>
+              <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2 }}>Not: Acılı olsun</Box>
               <Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} />
-              <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2 }}>{s('receipt_footer', 'Afiyet Olsun!')}</Box>
-              <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 4 }}>--- SON ---</Box>
+              <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2, mt: 0.5 }}>{s('receipt_footer', 'Afiyet Olsun!')}</Box>
+              <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 3, mt: 0.3 }}>--- SON ---</Box>
             </Card>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>* Kağıt genişliğine göre görüntü değişebilir.</Typography>
           </Box>
@@ -330,6 +336,11 @@ export default function SettingsPanel() {
             <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>İletişim Telefonu</Typography>
             <TextField fullWidth size="small" value={s('contact_phone', s('store_phone'))} onChange={e => upd('contact_phone', e.target.value)}
               InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>📞</Typography> }} />
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>İletişim E-postası</Typography>
+              <TextField fullWidth size="small" value={s('contact_email', 'bilgi@ugaburger.com')} onChange={e => upd('contact_email', e.target.value)}
+                InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>✉️</Typography> }} />
+            </Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 1.5 }}>
               <Box>
                 <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Enlem (Lat)</Typography>

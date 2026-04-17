@@ -313,14 +313,26 @@ const getDailyReport = async (req, res) => {
     const onlineRevenue = onlineOrdersList.reduce((sum, o) => sum + parseFloat(o.total_amount), 0);
     const tableRevenue = tableOrdersList.reduce((sum, o) => sum + parseFloat(o.total_amount), 0);
 
-    // Product stats
+    // Product stats - indirim oranına göre düzeltilmiş
     const productStats = {};
     for (const order of orders) {
+      const discountAmount = parseFloat(order.discount_amount) || 0;
+      const totalAmount = parseFloat(order.total_amount);
+      const originalTotal = totalAmount + discountAmount;
+      const paidRatio = originalTotal > 0 ? totalAmount / originalTotal : 1;
+
       for (const item of order.items) {
         const name = item.product?.name || 'Bilinmeyen';
         if (!productStats[name]) productStats[name] = { name, quantity: 0, revenue: 0 };
         productStats[name].quantity += item.quantity;
-        productStats[name].revenue += parseFloat(item.unit_price) * item.quantity;
+        let itemRevenue = parseFloat(item.unit_price) * item.quantity;
+        // Ekstra fiyatlarını da ekle
+        if (item.extras && Array.isArray(item.extras)) {
+          for (const ex of item.extras) {
+            itemRevenue += parseFloat(ex.price || 0) * (ex.quantity || 1) * item.quantity;
+          }
+        }
+        productStats[name].revenue += itemRevenue * paidRatio;
       }
     }
 
@@ -337,6 +349,8 @@ const getDailyReport = async (req, res) => {
       delivery_address: o.delivery_address,
       customer_name: o.customer_name,
       customer_phone: o.customer_phone,
+      promo_code: o.promo_code,
+      discount_amount: o.discount_amount,
       items: o.items.map(it => ({
         name: it.product?.name || 'Bilinmeyen',
         quantity: it.quantity,

@@ -125,23 +125,42 @@ export default function OrderDialog({ onClose, products }) {
 
   // Başarı ekranı
   if (successOrder) {
+    const orderId = successOrder.id || successOrder.order?.id;
     return (
       <Dialog open onClose={onClose} maxWidth="xs" fullWidth
-        sx={{ '& .MuiDialog-container': { alignItems: 'center', justifyContent: 'center' } }}
-        PaperProps={{ sx: { borderRadius: 4, textAlign: 'center', p: 4, mx: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' } }}>
-        <CheckCircleIcon sx={{ fontSize: 80, color: '#16a34a', mb: 2 }} />
-        <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Siparişiniz Alındı!</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Siparişiniz başarıyla oluşturuldu. En kısa sürede hazırlanacaktır.
-        </Typography>
-        <Box sx={{ bgcolor: '#f0fdf4', borderRadius: 3, p: 2, mb: 3, width: '100%' }}>
-          <Typography variant="caption" color="text.secondary">Sipariş Numaranız</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: '#16a34a' }}>#{successOrder.id || successOrder.order?.id}</Typography>
+        PaperProps={{ sx: { borderRadius: 5, overflow: 'hidden', p: 0 } }}>
+        {/* Üst yeşil alan */}
+        <Box sx={{ bgcolor: '#16a34a', pt: 5, pb: 6, textAlign: 'center', position: 'relative' }}>
+          <Box sx={{
+            width: 80, height: 80, borderRadius: '50%', bgcolor: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            <CheckCircleIcon sx={{ fontSize: 56, color: '#16a34a' }} />
+          </Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#fff', mb: 0.5 }}>Siparişiniz Alındı!</Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+            En kısa sürede hazırlanacaktır
+          </Typography>
+          {/* Alt dalga */}
+          <Box sx={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 30, bgcolor: '#fff', borderRadius: '50% 50% 0 0' }} />
         </Box>
-        <Button fullWidth variant="contained" onClick={onClose}
-          sx={{ py: 1.5, fontWeight: 700, fontSize: 16, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, borderRadius: 3 }}>
-          Tamam
-        </Button>
+        {/* Alt beyaz alan */}
+        <Box sx={{ px: 4, pb: 4, pt: 1, textAlign: 'center' }}>
+          <Box sx={{ bgcolor: '#f0fdf4', borderRadius: 4, p: 2.5, mb: 3, border: '2px dashed #bbf7d0' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase' }}>
+              Sipariş Numaranız
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 900, color: '#16a34a', mt: 0.5 }}>#{orderId}</Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Siparişinizi <strong>Profil</strong> sayfasından takip edebilirsiniz.
+          </Typography>
+          <Button fullWidth variant="contained" onClick={onClose}
+            sx={{ py: 1.5, fontWeight: 700, fontSize: 16, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, borderRadius: 3 }}>
+            Tamam
+          </Button>
+        </Box>
       </Dialog>
     );
   }
@@ -202,10 +221,10 @@ export default function OrderDialog({ onClose, products }) {
                 <CreditCardIcon sx={{ fontSize: 18, color: '#888' }} />
               </Stack>
               <TextField fullWidth size="small" label="Kart Üzerindeki İsim" value={cardName} onChange={e => setCardName(e.target.value)} sx={{ mb: 1.5 }} />
-              <TextField fullWidth size="small" label="Kart Numarası" value={cardNumber} onChange={e => setCardNumber(fmtCard(e.target.value))} placeholder="0000 0000 0000 0000" inputProps={{ maxLength: 19 }} sx={{ mb: 1.5 }} />
+              <TextField fullWidth size="small" label="Kart Numarası" value={cardNumber} onChange={e => setCardNumber(fmtCard(e.target.value))} placeholder="0000 0000 0000 0000" slotProps={{ htmlInput: { maxLength: 19 } }} sx={{ mb: 1.5 }} />
               <Stack direction="row" spacing={1.5}>
-                <TextField size="small" label="Son Kullanma" value={cardExpiry} onChange={e => setCardExpiry(fmtExp(e.target.value))} placeholder="AA/YY" inputProps={{ maxLength: 5 }} sx={{ flex: 1 }} />
-                <TextField size="small" label="CVV" value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="***" inputProps={{ maxLength: 4 }} type="password" sx={{ flex: 1 }} />
+                <TextField size="small" label="Son Kullanma" value={cardExpiry} onChange={e => setCardExpiry(fmtExp(e.target.value))} placeholder="AA/YY" slotProps={{ htmlInput: { maxLength: 5 } }} sx={{ flex: 1 }} />
+                <TextField size="small" label="CVV" value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="***" slotProps={{ htmlInput: { maxLength: 4, autoComplete: 'off' } }} type="password" sx={{ flex: 1 }} />
               </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                 💳 Ödeme, sipariş onaylandıktan sonra işlenecektir.
