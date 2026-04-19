@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api/api';
 import toast from 'react-hot-toast';
-import { Box, Typography, Chip, Card, Button, Stack, Divider, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { Box, Typography, Chip, Card, Button, Stack, Divider, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Checkbox } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import EditIcon from '@mui/icons-material/Edit';
 
@@ -36,6 +36,7 @@ export default function OrderManagement() {
   const [tables, setTables] = useState([]);
   const [tableEditOrder, setTableEditOrder] = useState(null);
   const [selectedTableId, setSelectedTableId] = useState('');
+  const [selectedOrders, setSelectedOrders] = useState([]);
 
   const prevOrderCount = useRef(null);
 
@@ -109,6 +110,27 @@ export default function OrderManagement() {
     } catch {
       toast.error('Güncelleme hatası');
     }
+  };
+
+  const handleBulkStatusChange = async () => {
+    const ordersToUpdate = filteredOrders.filter(o => selectedOrders.includes(o.id) && nextStatus[o.status]);
+    if (ordersToUpdate.length === 0) return;
+    try {
+      await Promise.all(ordersToUpdate.map(o => api.put(`/admin/orders/${o.id}/status`, { status: nextStatus[o.status] })));
+      toast.success(`${ordersToUpdate.length} sipariş güncellendi`);
+      setSelectedOrders([]);
+      fetchOrders();
+    } catch { toast.error('Toplu güncelleme hatası'); }
+  };
+
+  const toggleSelectOrder = (id) => {
+    setSelectedOrders(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    const actionable = filteredOrders.filter(o => nextStatus[o.status]).map(o => o.id);
+    const allSelected = actionable.length > 0 && actionable.every(id => selectedOrders.includes(id));
+    setSelectedOrders(allSelected ? selectedOrders.filter(id => !actionable.includes(id)) : [...new Set([...selectedOrders, ...actionable])]);
   };
 
   const handleTableChange = async (orderId, tableId) => {
@@ -237,15 +259,36 @@ export default function OrderManagement() {
       <TextField fullWidth size="small" placeholder="Sipariş numarası ile ara... (örn: 11)"
         value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ mb: 2 }} />
 
+      {filteredOrders.some(o => nextStatus[o.status]) && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+          <Button size="small" variant="outlined" onClick={toggleSelectAll}
+            sx={{ fontWeight: 600, fontSize: 12 }}>
+            {filteredOrders.filter(o => nextStatus[o.status]).every(o => selectedOrders.includes(o.id)) && filteredOrders.some(o => nextStatus[o.status]) ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+          </Button>
+          {selectedOrders.filter(id => filteredOrders.some(o => o.id === id)).length > 0 && (
+            <Button size="small" variant="contained" color="success" onClick={handleBulkStatusChange}
+              sx={{ fontWeight: 600, fontSize: 12 }}>
+              Seçilenleri Güncelle ({selectedOrders.filter(id => filteredOrders.some(o => o.id === id)).length})
+            </Button>
+          )}
+        </Stack>
+      )}
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
         {filteredOrders.length === 0 ? (
           <Typography color="text.secondary" sx={{ p: 2.5 }}>Bu durumda sipariş bulunmuyor.</Typography>
         ) : (
           filteredOrders.slice(0, visibleCount).map(order => {
             return (
-            <Card key={order.id} sx={{ p: 2.5 }}>
+            <Card key={order.id} sx={{ p: 2.5, ...(selectedOrders.includes(order.id) && { outline: '2px solid #16a34a', outlineOffset: -2 }) }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                <Typography sx={{ fontWeight: 800, fontSize: 16 }}>#{order.id} - {formatDate(order.createdAt)}</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  {nextStatus[order.status] && (
+                    <Checkbox size="small" checked={selectedOrders.includes(order.id)} onChange={() => toggleSelectOrder(order.id)}
+                      sx={{ p: 0, mr: 0.5 }} />
+                  )}
+                  <Typography sx={{ fontWeight: 800, fontSize: 16 }}>#{order.id} - {formatDate(order.createdAt)}</Typography>
+                </Stack>
               </Stack>
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5 }}>
                 <Chip label={order.order_type === 'online' ? `🌐 Online` : order.table ? `🪑 Masa - ${order.table.table_name || 'Masa ' + order.table.table_number}` : `📱 Telefon`}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dialog, DialogContent, Box, Typography, Button, TextField, Stack, IconButton,
-  Chip, CircularProgress
+  Chip, CircularProgress, Autocomplete
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
@@ -66,11 +66,47 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
   const [locating, setLocating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [storeSettings, setStoreSettings] = useState({});
-  const [zoneInfo, setZoneInfo] = useState(null); // { zone, min_order, distance } veya { outside, distance }
+  const [zoneInfo, setZoneInfo] = useState(null);
+  const [cities, setCities] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [neighborhoods, setNeighborhoods] = useState([]);
+  const skipReverseGeocode = useRef(false);
   const mapRef = useRef(null);
 
-  // Ayarları çek (delivery_zones, contact_lat, contact_lng)
+  // Ayarları çek
   useEffect(() => { api.get('/settings').then(res => setStoreSettings(res.data)); }, []);
+
+  // İlleri çek (turkiyeapi.dev)
+  useEffect(() => {
+    fetch('https://api.turkiyeapi.dev/v1/provinces?fields=name')
+      .then(r => r.json())
+      .then(data => setCities((data.data || []).map(p => p.name).sort((a, b) => a.localeCompare(b, 'tr'))))
+      .catch(() => {});
+  }, []);
+
+  // İl değişince ilçeleri çek
+  useEffect(() => {
+    if (!city) { setDistricts([]); return; }
+    fetch(`https://api.turkiyeapi.dev/v1/districts?province=${encodeURIComponent(city)}&fields=name`)
+      .then(r => r.json())
+      .then(data => {
+        setDistricts((data.data || []).map(d => d.name).sort((a, b) => a.localeCompare(b, 'tr')));
+      })
+      .catch(() => setDistricts([]));
+  }, [city]);
+
+  // İlçe değişince mahalleleri çek
+  useEffect(() => {
+    if (!city || !district) { setNeighborhoods([]); return; }
+    fetch(`https://api.turkiyeapi.dev/v1/neighborhoods?province=${encodeURIComponent(city)}&district=${encodeURIComponent(district)}&fields=name`)
+      .then(r => r.json())
+      .then(data => {
+        setNeighborhoods((data.data || []).map(n => n.name).sort((a, b) => a.localeCompare(b, 'tr')));
+      })
+      .catch(() => setNeighborhoods([]));
+  }, [city, district]);
+
+
 
   // Konum değişince bölge kontrolü yap
   useEffect(() => {
@@ -88,6 +124,21 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
     }
   }, [position, storeSettings]);
 
+  // Forward geocoding: dropdown seçiminde haritayı güncelle
+  const forwardGeocode = useCallback((cityVal, districtVal, neighborhoodVal) => {
+    if (!cityVal || !districtVal) return;
+    const q = [neighborhoodVal, districtVal, cityVal, 'Turkey'].filter(Boolean).join(' ');
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=tr`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.[0]) {
+          skipReverseGeocode.current = true;
+          setPosition([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Reverse geocoding: koordinattan il/ilçe/mahalle/sokak otomatik doldur
   const reverseGeocode = useCallback(async (lat, lng) => {
     setGeocoding(true);
@@ -98,25 +149,23 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
       const data = await res.json();
       if (data?.address) {
         const a = data.address;
-        // İl
         setCity(a.province || a.state || a.city || '');
-        // İlçe
         setDistrict(a.town || a.county || a.city_district || a.district || '');
-        // Mahalle
         setNeighborhood(a.neighbourhood || a.suburb || a.quarter || '');
-        // Cadde/Sokak
         setStreet(a.road || a.pedestrian || a.street || '');
       }
-    } catch {
-      // Geocoding başarısız olursa sessizce devam et
-    } finally {
+    } catch {} finally {
       setGeocoding(false);
     }
   }, []);
 
-  // Konum değişince reverse geocoding yap
+  // Konum değişince reverse geocoding yap (harita tıklama / GPS)
   useEffect(() => {
     if (position) {
+      if (skipReverseGeocode.current) {
+        skipReverseGeocode.current = false;
+        return;
+      }
       reverseGeocode(position[0], position[1]);
     }
   }, [position, reverseGeocode]);
@@ -182,8 +231,6 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
     if (!district.trim()) return;
     if (!neighborhood.trim()) return;
     if (!street.trim()) return;
-    if (!buildingNo.trim()) return;
-    if (!doorNo.trim()) return;
 
     const addressData = {
       title: addrTitle,
@@ -293,38 +340,67 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
           ))}
         </Stack>
 
-        {/* İl - İlçe (Haritadan otomatik dolar) */}
+        {/* İl - İlçe */}
         <Stack direction="row" spacing={1.5} sx={{ mb: 1.5 }}>
-          <TextField
-            size="small" label="İl *" value={city}
-            onChange={e => setCity(e.target.value)}
-            placeholder={geocoding ? 'Yükleniyor...' : 'Haritadan seçin'}
-            slotProps={{ input: { readOnly: geocoding } }}
+          <Autocomplete
+            freeSolo
+            options={cities}
+            value={city || ''}
+            onChange={(_, v) => {
+              const val = v || '';
+              setCity(val);
+              setDistrict('');
+              setNeighborhood('');
+              setStreet('');
+              setDistricts([]);
+              setNeighborhoods([]);
+              if (val) forwardGeocode(val, '', '');
+            }}
+            disabled={geocoding}
+            renderInput={(params) => <TextField {...params} size="small" label="İl *" placeholder="İl seçin" />}
             sx={{ flex: 1 }}
+            size="small"
           />
-          <TextField
-            size="small" label="İlçe *" value={district}
-            onChange={e => setDistrict(e.target.value)}
-            placeholder={geocoding ? 'Yükleniyor...' : 'Haritadan seçin'}
-            slotProps={{ input: { readOnly: geocoding } }}
+          <Autocomplete
+            freeSolo
+            options={districts}
+            value={district || ''}
+            onChange={(_, v) => {
+              const val = v || '';
+              setDistrict(val);
+              setNeighborhood('');
+              setNeighborhoods([]);
+              setStreet('');
+              if (val) forwardGeocode(city, val, '');
+            }}
+            disabled={geocoding || !city}
+            renderInput={(params) => <TextField {...params} size="small" label="İlçe *" placeholder="İlçe seçin" />}
             sx={{ flex: 1 }}
+            size="small"
           />
         </Stack>
 
-        {/* Mahalle (Haritadan otomatik dolar) */}
-        <TextField
-          fullWidth size="small" label="Mahalle *" value={neighborhood}
-          onChange={e => setNeighborhood(e.target.value)}
-          placeholder={geocoding ? 'Yükleniyor...' : 'Haritadan seçin'}
-          slotProps={{ input: { readOnly: geocoding } }}
+        {/* Mahalle */}
+        <Autocomplete
+          freeSolo
+          options={neighborhoods}
+          value={neighborhood || ''}
+          onChange={(_, v) => {
+            const val = v || '';
+            setNeighborhood(val);
+            setStreet('');
+            if (val) forwardGeocode(city, district, val);
+          }}
+          disabled={geocoding || !district}
+          renderInput={(params) => <TextField {...params} size="small" label="Mahalle *" placeholder="Mahalle seçin" />}
           sx={{ mb: 1.5 }}
+          size="small"
         />
 
-        {/* Cadde/Sokak (Haritadan otomatik dolar) */}
+        {/* Cadde/Sokak */}
         <TextField
-          fullWidth size="small" label="Cadde/Sokak *" value={street}
+          fullWidth size="small" label="Cadde/Sokak" value={street}
           onChange={e => setStreet(e.target.value)}
-          placeholder={geocoding ? 'Yükleniyor...' : 'Haritadan seçin'}
           sx={{ mb: 1.5 }}
         />
 
@@ -339,7 +415,7 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
         {/* Bina No - Kat No - Daire No */}
         <Stack direction="row" spacing={1.5} sx={{ mb: 1.5 }}>
           <TextField
-            size="small" label="Bina No *" value={buildingNo}
+            size="small" label="Bina No" value={buildingNo}
             onChange={e => setBuildingNo(e.target.value)}
             placeholder="1B"
             sx={{ flex: 1 }}
@@ -351,7 +427,7 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
             sx={{ flex: 1 }}
           />
           <TextField
-            size="small" label="Daire No *" value={doorNo}
+            size="small" label="Daire No" value={doorNo}
             onChange={e => setDoorNo(e.target.value)}
             placeholder="0"
             sx={{ flex: 1 }}
@@ -378,7 +454,7 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
         {/* Kaydet */}
         <Button
           fullWidth variant="contained" onClick={handleSave}
-          disabled={!city || !district || !neighborhood || !street || !buildingNo || !doorNo || zoneInfo?.outside}
+          disabled={!city || !district || !neighborhood || !street || zoneInfo?.outside}
           sx={{
             py: 1.5, fontWeight: 700, fontSize: 16, borderRadius: 3,
             bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' },

@@ -52,12 +52,11 @@ export default function HomePage() {
   return (
     <Box sx={{
       position: 'relative', width: '100%', height: '100vh',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       backgroundImage: `url(${heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center',
-      pb: { xs: 8, md: 28 },
     }}>
       <Box sx={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, rgba(0,0,0,${Math.min(heroOverlay + 0.1, 1).toFixed(2)}) 0%, rgba(0,0,0,${(heroOverlay * 0.3).toFixed(2)}) 50%, rgba(0,0,0,${(heroOverlay * 0.5).toFixed(2)}) 100%)` }} />
-      <Box sx={{ position: 'relative', zIndex: 2, textAlign: 'center' }}>
+      <Box sx={{ position: 'relative', zIndex: 2, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Typography variant="h1" sx={{
           fontSize: heroTextSize, fontWeight: 900, color: heroTextColor,
           textShadow: '2px 4px 24px rgba(0,0,0,0.7)', mb: 4, fontStyle: 'italic',
@@ -65,7 +64,7 @@ export default function HomePage() {
           {heroTitle}
         </Typography>
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 8  }} justifyContent="center" sx={{ mb: 3 , ml: { xs: 0, md: 6}}}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 3 }} justifyContent="center" alignItems="center" sx={{ mb: 3 }}>
           <Button onClick={() => navigate('/menu')} variant="contained" startIcon={<ShoppingBagIcon />}
             sx={{ bgcolor: '#f97316', borderRadius: 30, px: { xs: 4, md: 6 }, py: { xs: 1.8, md: 2.2 }, fontSize: { xs: 15, md: 17 }, fontWeight: 700, letterSpacing: 0.3, boxShadow: '0 4px 16px rgba(249,115,22,0.4)', '&:hover': { bgcolor: '#ea580c', transform: 'scale(1.03)' }, transition: 'all 0.2s' }}>
             Menü ve Siparişler
@@ -78,14 +77,15 @@ export default function HomePage() {
 
         {googleClientId && googleClientId !== 'YOUR_GOOGLE_CLIENT_ID_HERE' && <GoogleHomeBtn />}
 
-        <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ ml: 36 }}>
-          <Typography component={Link} to="/login" sx={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 3, '&:hover': { color: '#fff' } }}>
+        <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="center">
+          <Button component={Link} to="/login" variant="contained"
+            sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 30, px: 3.5, py: 1, fontSize: 14, fontWeight: 700, backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}>
             Giriş Yap
-          </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>|</Typography>
-          <Typography component={Link} to="/register" sx={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 3, '&:hover': { color: '#fff' } }}>
+          </Button>
+          <Button component={Link} to="/register" variant="contained"
+            sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 30, px: 3.5, py: 1, fontSize: 14, fontWeight: 700, backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}>
             Kayıt Ol
-          </Typography>
+          </Button>
         </Stack>
       </Box>
     </Box>
