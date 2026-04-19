@@ -6,15 +6,12 @@ import {
   FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import RemoveIcon from '@mui/icons-material/Remove';
 
 export default function TableOrders() {
   const [tables, setTables] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [newTableNum, setNewTableNum] = useState('');
-  const [newTableName, setNewTableName] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
 
   const [selectedTable, setSelectedTable] = useState('');
@@ -38,25 +35,6 @@ export default function TableOrders() {
   }, []);
 
   const fetchTables = () => api.get('/admin/tables').then(res => setTables(res.data));
-
-  const addTable = async () => {
-    if (!newTableNum) return;
-    try {
-      await api.post('/admin/tables', { table_number: parseInt(newTableNum), table_name: newTableName || null });
-      toast.success('Masa eklendi');
-      setNewTableNum('');
-      setNewTableName('');
-      fetchTables();
-    } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
-  };
-
-  const deleteTable = async (id) => {
-    try {
-      await api.delete(`/admin/tables/${id}`);
-      toast.success('Masa silindi');
-      fetchTables();
-    } catch { toast.error('Hata'); }
-  };
 
   const handleProductClick = (product) => {
     if (product.extras && product.extras.length > 0) {
@@ -119,9 +97,12 @@ export default function TableOrders() {
     const items = order.items || [];
     const d = new Date(order.createdAt || order.created_at);
     const dateStr = d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const masaInfo = order.table ? (order.table.table_name ? `${order.table.table_name} (${order.table.table_number})` : order.table.table_number) : '-';
     const type = order.order_type === 'online'
-      ? `ONLINE: ${order.delivery_address || '-'}`
-      : `MASA: ${order.table ? order.table.table_number : '-'}`;
+      ? `🌐 ONLINE SİPARİŞ`
+      : order.table
+        ? `MASA: ${masaInfo}`
+        : `📱 TELEFON SİPARİŞİ`;
     const customer = order.customer_name || '-';
     const phone = order.customer_phone || '';
     const payment = order.payment_method === 'online' ? '💳 Kart' : '💵 Nakit';
@@ -161,7 +142,8 @@ export default function TableOrders() {
   <div class="bold center" style="font-size:${rFontPx + 2}px">#${order.id}</div>
   <div class="center" style="font-size:${rFontPx - 2}px">${dateStr}</div>
   <div class="sep"></div>
-  <div style="font-size:${rFontPx - 1}px">${type}</div>
+  <div style="font-size:${rFontPx - 1}px"><b>${type}</b></div>
+  ${order.order_note ? `<div style="font-size:${rFontPx - 1}px">📝 Not: ${order.order_note}</div>` : ''}
   ${customer !== '-' ? `<div style="font-size:${rFontPx - 1}px">Müşteri: ${customer}</div>` : ''}
   ${phone ? `<div style="font-size:${rFontPx - 1}px">Tel: ${phone}</div>` : ''}
   ${order.delivery_address ? `<div style="font-size:${rFontPx - 1}px">Adres: ${order.delivery_address}</div>` : ''}
@@ -171,19 +153,25 @@ export default function TableOrders() {
   <table><tr><td class="total">TOPLAM:</td><td class="total" style="text-align:right">${parseFloat(order.total_amount).toFixed(2)} TL</td></tr></table>
   <div class="sep"></div>
   <div class="center" style="font-size:${rFontPx - 2}px">Ödeme: ${payment}</div>
-  ${order.order_note ? `<div class="center" style="font-size:${rFontPx - 2}px">Not: ${order.order_note}</div>` : ''}
   <div class="sep"></div>
   <div class="center" style="font-size:${rFontPx - 2}px;margin-top:4px">${rFooter}</div>
   <div class="center" style="font-size:${rFontPx - 3}px;margin-top:2px">--- SON ---</div>
 </body></html>`;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
-    document.body.appendChild(iframe);
-    iframe.contentDocument.write(html);
-    iframe.contentDocument.close();
-    iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
-    setTimeout(() => iframe.contentWindow.print(), 200);
+    // Electron varsa popup'sız silent print, yoksa fallback iframe
+    if (window.electronAPI?.isElectron) {
+      window.electronAPI.silentPrint(html)
+        .then(() => console.log('Fiş yazdırıldı (silent)'))
+        .catch(err => console.error('Print hatası:', err));
+    } else {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
+      document.body.appendChild(iframe);
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+      iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+      setTimeout(() => iframe.contentWindow.print(), 200);
+    }
   };
 
   const submitQuickOrder = async () => {
@@ -204,7 +192,9 @@ export default function TableOrders() {
       toast.success('Hızlı sipariş oluşturuldu!');
       setCartItems([]); setOrderNote(''); setSelectedTable(''); setPaymentType('cash');
       setCustomerName(''); setCustomerPhone(''); setCustomerAddress('');
-      setTimeout(() => printReceipt(res.data), 100);
+      if (settings.receipt_auto_print !== 'false') {
+        setTimeout(() => printReceipt(res.data), 100);
+      }
     } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
   };
 
@@ -215,23 +205,8 @@ export default function TableOrders() {
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>Masa Siparişleri / Hızlı Sipariş</Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 320px' }, gap: 2 }}>
-        {/* Sol Taraf: Masa Yönetimi + Hızlı Sipariş */}
+        {/* Sol Taraf: Hızlı Sipariş */}
         <Box sx={{ minWidth: 0 }}>
-      {/* Table Management */}
-      <Card sx={{ p: 2.5, mb: 3 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>Masa Yönetimi</Typography>
-        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-          <TextField size="small" type="number" placeholder="Masa No" value={newTableNum} onChange={e => setNewTableNum(e.target.value)} sx={{ width: 100 }} />
-          <TextField size="small" placeholder="Masa İsmi (opsiyonel)" value={newTableName} onChange={e => setNewTableName(e.target.value)} sx={{ width: 180 }} />
-          <Button variant="contained" startIcon={<AddIcon />} onClick={addTable} sx={{ fontWeight: 600 }}>Ekle</Button>
-        </Stack>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-          {tables.map(t => (
-            <Chip key={t.id} label={t.table_name ? `${t.table_name} (${t.table_number})` : `Masa ${t.table_number}`} onDelete={() => deleteTable(t.id)} deleteIcon={<DeleteIcon fontSize="small" />} variant="outlined" />
-          ))}
-        </Stack>
-      </Card>
-
       {/* Quick Order */}
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>Hızlı Sipariş</Typography>
           <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 2, '&::-webkit-scrollbar': { display: 'none' } }}>

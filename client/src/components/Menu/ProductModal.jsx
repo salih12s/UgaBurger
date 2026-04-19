@@ -18,11 +18,19 @@ export default function ProductModal({ product, onClose }) {
 
   const toggleExtra = (extra) => {
     setSelectedExtras(prev =>
-      prev.find(e => e.id === extra.id) ? prev.filter(e => e.id !== extra.id) : [...prev, extra]
+      prev.find(e => e.id === extra.id) ? prev.filter(e => e.id !== extra.id) : [...prev, { ...extra, quantity: 1 }]
     );
   };
 
-  const extrasTotal = selectedExtras.reduce((s, e) => s + parseFloat(e.price), 0);
+  const changeExtraQty = (extraId, delta) => {
+    setSelectedExtras(prev => prev.map(e => {
+      if (e.id !== extraId) return e;
+      const newQty = e.quantity + delta;
+      return newQty >= 1 ? { ...e, quantity: newQty } : e;
+    }));
+  };
+
+  const extrasTotal = selectedExtras.reduce((s, e) => s + parseFloat(e.price) * (e.quantity || 1), 0);
   const totalPrice = (parseFloat(product.price) + extrasTotal) * quantity;
 
   const handleAdd = () => {
@@ -67,21 +75,36 @@ export default function ProductModal({ product, onClose }) {
             </Box>
           ) : (
             extras.map(extra => {
-              const isSelected = !!selectedExtras.find(e => e.id === extra.id);
+              const selected = selectedExtras.find(e => e.id === extra.id);
+              const isSelected = !!selected;
               return (
-                <Box key={extra.id} onClick={() => toggleExtra(extra)}
+                <Box key={extra.id}
                   sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5,
                     border: 1, borderColor: isSelected ? '#dc2626' : '#eee', borderRadius: 2, mt: 1,
-                    cursor: 'pointer', bgcolor: isSelected ? '#fef2f2' : 'transparent', transition: 'all 0.2s',
-                    '&:hover': { borderColor: '#dc2626' } }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Checkbox checked={isSelected} size="small" sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
+                    bgcolor: isSelected ? '#fef2f2' : 'transparent', transition: 'all 0.2s' }}>
+                  <Stack direction="row" alignItems="center" spacing={1} onClick={() => !isSelected && toggleExtra(extra)} sx={{ cursor: !isSelected ? 'pointer' : 'default', flex: 1 }}>
+                    <Checkbox checked={isSelected} size="small" onClick={(e) => { e.stopPropagation(); toggleExtra(extra); }} sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
                     <Box>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>{extra.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">1 ADET</Typography>
+                      <Typography variant="caption" color="text.secondary">{isSelected ? `${selected.quantity} ADET` : '1 ADET'}</Typography>
                     </Box>
                   </Stack>
-                  <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 600 }}>+{parseFloat(extra.price).toFixed(2)} ₺</Typography>
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    {isSelected && (
+                      <>
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); if (selected.quantity <= 1) { toggleExtra(extra); } else { changeExtraQty(extra.id, -1); } }}
+                          sx={{ border: 1, borderColor: '#ddd', width: 26, height: 26 }}>
+                          <RemoveIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                        <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{selected.quantity}</Typography>
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); changeExtraQty(extra.id, 1); }}
+                          sx={{ border: 1, borderColor: '#ddd', width: 26, height: 26 }}>
+                          <AddIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </>
+                    )}
+                    <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 600, ml: 1, whiteSpace: 'nowrap' }}>+{(parseFloat(extra.price) * (isSelected ? selected.quantity : 1)).toFixed(2)} ₺</Typography>
+                  </Stack>
                 </Box>
               );
             })

@@ -30,6 +30,7 @@ app.use('/images', express.static(path.join(__dirname, '../Images')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/paytr', require('./routes/paytr'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Settings endpoint (public)

@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import 'leaflet/dist/leaflet.css';
 
 const DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
@@ -27,12 +28,46 @@ export default function SettingsPanel() {
   const [loading, setLoading] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 36.8, lng: 34.63 });
   const [zones, setZones] = useState([]);
+  const [contactMapVisible, setContactMapVisible] = useState(false);
+  const [zoneMapVisible, setZoneMapVisible] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
   const zonesRef = useRef([]);
+  const zoneMapRef = useRef(null);
+  const zoneMapInstanceRef = useRef(null);
+  const zoneMarkerRef = useRef(null);
+  const zoneCirclesRef = useRef([]);
+  const leafletRef = useRef(null);
 
   useEffect(() => { api.get('/admin/settings').then(res => setSettings(res.data)); }, []);
+
+  // Tables
+  const [tables, setTables] = useState([]);
+  const [newTableNum, setNewTableNum] = useState('');
+  const [newTableName, setNewTableName] = useState('');
+  const fetchTables = () => api.get('/admin/tables').then(res => setTables(res.data));
+  useEffect(() => { fetchTables(); }, []);
+
+  const addTable = async () => {
+    if (!newTableNum) return;
+    try {
+      await api.post('/admin/tables', { table_number: parseInt(newTableNum), table_name: newTableName || null });
+      toast.success('Masa eklendi');
+      setNewTableNum('');
+      setNewTableName('');
+      fetchTables();
+    } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
+  };
+
+  const deleteTable = async (id) => {
+    try {
+      await api.delete(`/admin/tables/${id}`);
+      toast.success('Masa silindi');
+      fetchTables();
+    } catch { toast.error('Hata'); }
+  };
+
   useEffect(() => {
     if (settings.delivery_zones) {
       try { setZones(JSON.parse(settings.delivery_zones)); } catch { setZones([]); }
@@ -100,6 +135,8 @@ export default function SettingsPanel() {
       ['receipt_show_table', s('receipt_show_table','true')],
       ['receipt_show_prices', s('receipt_show_prices','true')],
       ['receipt_show_total', s('receipt_show_total','true')],
+      ['receipt_silent_print', s('receipt_silent_print','false')],
+      ['receipt_auto_print', s('receipt_auto_print','true')],
       ['contact_address', s('contact_address')], ['contact_phone', s('contact_phone')],
       ['contact_email', s('contact_email', 'bilgi@ugaburger.com')],
       ['contact_lat', s('contact_lat','36.807804')], ['contact_lng', s('contact_lng','34.637124')],
@@ -128,44 +165,58 @@ export default function SettingsPanel() {
     }
   }, [settings.contact_lat, settings.contact_lng]);
 
+  // Leaflet yükle
+  const loadLeaflet = async () => {
+    if (leafletRef.current) return leafletRef.current;
+    const L = await import('leaflet');
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    });
+    leafletRef.current = L;
+    return L;
+  };
+
+  const handleMapClick = (marker, latlng) => {
+    marker.setLatLng(latlng);
+    upd('contact_lat', String(latlng.lat));
+    upd('contact_lng', String(latlng.lng));
+    setMapCenter({ lat: latlng.lat, lng: latlng.lng });
+  };
+
+  // İletişim haritası
   const initMap = () => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-    import('leaflet').then(L => {
-      delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-      const map = L.map(mapRef.current).setView([mapCenter.lat, mapCenter.lng], 13);
+    setContactMapVisible(true);
+    if (mapInstanceRef.current) {
+      setTimeout(() => mapInstanceRef.current.invalidateSize(), 200);
+      return;
+    }
+    setTimeout(async () => {
+      if (!mapRef.current) return;
+      const L = await loadLeaflet();
+      const map = L.map(mapRef.current, { tap: false }).setView([mapCenter.lat, mapCenter.lng], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
       const marker = L.marker([mapCenter.lat, mapCenter.lng], { draggable: true }).addTo(map);
-      marker.on('dragend', () => {
-        const p = marker.getLatLng();
-        upd('contact_lat', String(p.lat)); upd('contact_lng', String(p.lng));
-        setMapCenter({ lat: p.lat, lng: p.lng });
-        drawZoneCircles(L, map);
-      });
-      map.on('click', (e) => {
-        marker.setLatLng(e.latlng);
-        upd('contact_lat', String(e.latlng.lat)); upd('contact_lng', String(e.latlng.lng));
-        setMapCenter({ lat: e.latlng.lat, lng: e.latlng.lng });
-        drawZoneCircles(L, map);
-      });
+      marker.on('dragend', () => handleMapClick(marker, marker.getLatLng()));
+      map.on('click', (e) => handleMapClick(marker, e.latlng));
       mapInstanceRef.current = map;
       markerRef.current = marker;
       drawZoneCircles(L, map);
-    });
+      setTimeout(() => map.invalidateSize(), 300);
+    }, 200);
   };
+
+  const ZONE_COLORS = ['#dc2626', '#f59e0b', '#3b82f6', '#16a34a', '#8b5cf6'];
 
   const drawZoneCircles = (L, map) => {
     zonesRef.current.forEach(c => map.removeLayer(c));
     zonesRef.current = [];
-    const colors = ['#dc2626', '#f59e0b', '#3b82f6', '#16a34a', '#8b5cf6'];
     zones.forEach((z, i) => {
       const c = L.circle([mapCenter.lat, mapCenter.lng], {
-        radius: z.radius * 1000, color: colors[i % colors.length],
-        fillColor: colors[i % colors.length], fillOpacity: 0.1, dashArray: '5,5'
+        radius: z.radius * 1000, color: ZONE_COLORS[i % ZONE_COLORS.length],
+        fillColor: ZONE_COLORS[i % ZONE_COLORS.length], fillOpacity: 0.1, dashArray: '5,5'
       }).addTo(map);
       zonesRef.current.push(c);
     });
@@ -173,13 +224,62 @@ export default function SettingsPanel() {
 
   useEffect(() => {
     if (mapInstanceRef.current) {
-      import('leaflet').then(L => drawZoneCircles(L, mapInstanceRef.current));
+      loadLeaflet().then(L => drawZoneCircles(L, mapInstanceRef.current));
     }
   }, [zones, mapCenter]);
 
   const addZone = () => setZones(prev => [...prev, { radius: (prev.length + 1) * 5, min_order: 100 }]);
   const removeZone = (i) => setZones(prev => prev.filter((_, idx) => idx !== i));
   const updateZone = (i, key, val) => setZones(prev => prev.map((z, idx) => idx === i ? { ...z, [key]: parseFloat(val) || 0 } : z));
+
+  // Teslimat bölgeleri haritası
+  const initZoneMap = () => {
+    setZoneMapVisible(true);
+    if (zoneMapInstanceRef.current) {
+      setTimeout(() => zoneMapInstanceRef.current.invalidateSize(), 200);
+      return;
+    }
+    setTimeout(async () => {
+      if (!zoneMapRef.current) return;
+      const L = await loadLeaflet();
+      const map = L.map(zoneMapRef.current, { tap: false }).setView([mapCenter.lat, mapCenter.lng], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+      const marker = L.marker([mapCenter.lat, mapCenter.lng], { draggable: true }).addTo(map);
+      marker.bindPopup('Restoran Konumu');
+      marker.on('dragend', () => handleMapClick(marker, marker.getLatLng()));
+      map.on('click', (e) => handleMapClick(marker, e.latlng));
+      zoneMapInstanceRef.current = map;
+      zoneMarkerRef.current = marker;
+      drawZoneMapCircles(L, map);
+      setTimeout(() => map.invalidateSize(), 300);
+    }, 200);
+  };
+
+  const drawZoneMapCircles = (L, map) => {
+    zoneCirclesRef.current.forEach(c => map.removeLayer(c));
+    zoneCirclesRef.current = [];
+    zones.forEach((z, i) => {
+      const c = L.circle([mapCenter.lat, mapCenter.lng], {
+        radius: z.radius * 1000, color: ZONE_COLORS[i % ZONE_COLORS.length],
+        fillColor: ZONE_COLORS[i % ZONE_COLORS.length], fillOpacity: 0.1, dashArray: '5,5', weight: 2
+      }).addTo(map);
+      c.bindTooltip(`${i + 1}. Bölge: ${z.radius} km - Min. ${z.min_order} TL`, { permanent: false });
+      zoneCirclesRef.current.push(c);
+    });
+    if (zones.length > 0) {
+      const maxRadius = Math.max(...zones.map(z => z.radius));
+      map.fitBounds(L.latLng(mapCenter.lat, mapCenter.lng).toBounds(maxRadius * 2000));
+    }
+  };
+
+  useEffect(() => {
+    if (zoneMapInstanceRef.current) {
+      loadLeaflet().then(L => {
+        zoneMarkerRef.current?.setLatLng([mapCenter.lat, mapCenter.lng]);
+        drawZoneMapCircles(L, zoneMapInstanceRef.current);
+      });
+    }
+  }, [zones, mapCenter]);
 
   const isOnline = s('online_order_active') === 'true';
   const receiptFontPx = { small: 12, medium: 14, large: 16 }[s('receipt_font_size', 'medium')] || 14;
@@ -211,6 +311,21 @@ export default function SettingsPanel() {
             <TextField fullWidth size="small" value={s('site_name', 'MUSATTI BURGER')} onChange={e => upd('site_name', e.target.value)} />
           </Box>
         </Box>
+      </Section>
+
+      {/* Masa Yönetimi */}
+      <Section icon="🪑" title="Masa Yönetimi">
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          <TextField size="small" type="number" placeholder="Masa No" value={newTableNum} onChange={e => setNewTableNum(e.target.value)} sx={{ width: 100 }} />
+          <TextField size="small" placeholder="Masa İsmi (opsiyonel)" value={newTableName} onChange={e => setNewTableName(e.target.value)} sx={{ width: 180 }} />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={addTable} sx={{ fontWeight: 600 }}>Ekle</Button>
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+          {tables.map(t => (
+            <Chip key={t.id} label={t.table_name ? `${t.table_name} (${t.table_number})` : `Masa ${t.table_number}`}
+              onDelete={() => deleteTable(t.id)} deleteIcon={<DeleteIcon fontSize="small" />} variant="outlined" />
+          ))}
+        </Stack>
       </Section>
 
       {/* 2. Restoran Kapanış Görünümü */}
@@ -291,6 +406,27 @@ export default function SettingsPanel() {
               <MenuItem value="medium">Orta (14px)</MenuItem>
               <MenuItem value="large">Büyük (16px)</MenuItem>
             </Select>
+
+            <Box sx={{ p: 2, bgcolor: '#f0f9ff', borderRadius: 2, border: '1px solid #bae6fd', mb: 2 }}>
+              <FormControlLabel
+                control={<Switch checked={s('receipt_silent_print', 'false') === 'true'} onChange={e => upd('receipt_silent_print', e.target.checked ? 'true' : 'false')}
+                  sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#3b82f6' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#3b82f6' } }} />}
+                label={<Typography variant="body2" sx={{ fontWeight: 700 }}>Sessiz Yazdırma (Yazıcı Penceresi Gösterme)</Typography>} />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                Bu özellik için tarayıcınızı <strong>--kiosk-printing</strong> parametresiyle başlatmanız gerekir.
+                Chrome kısayoluna sağ tıklayıp Özellikler'den Hedef kısmına <code> --kiosk-printing</code> ekleyin.
+                Bu sayede yazdırma penceresi açılmadan direkt yazıcıya gönderilir.
+              </Typography>
+            </Box>
+
+            <FormControlLabel
+              control={<Switch checked={s('receipt_auto_print', 'true') === 'true'} onChange={e => upd('receipt_auto_print', e.target.checked ? 'true' : 'false')}
+                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#16a34a' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#16a34a' } }} />}
+              label={<Typography variant="body2" sx={{ fontWeight: 700 }}>Sipariş Onayında Otomatik Yazdır</Typography>} sx={{ mb: 1 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4, mb: 2 }}>
+              Kapalıysa, sipariş onaylandığında fiş otomatik yazdırılmaz. Manuel olarak 🖨️ butonuyla yazdırabilirsiniz.
+            </Typography>
+
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
               {[['receipt_show_date', 'Tarih Göster'], ['receipt_show_time', 'Saat Göster'], ['receipt_show_order_no', 'Sipariş No'], ['receipt_show_table', 'Masa Bilgisi'], ['receipt_show_prices', 'Ürün Fiyatları'], ['receipt_show_total', 'Toplam Tutar']].map(([k, label]) => (
                 <FormControlLabel key={k} control={<Checkbox checked={s(k, 'true') === 'true'} onChange={e => upd(k, e.target.checked ? 'true' : 'false')} size="small" />}
@@ -354,21 +490,38 @@ export default function SettingsPanel() {
             <Button fullWidth variant="outlined" size="small" sx={{ mt: 1.5, color: '#3b82f6' }} onClick={initMap}>📍 Haritadan Seç</Button>
           </Box>
         </Box>
-        <Box ref={mapRef} sx={{ height: 300, borderRadius: 2, border: '1px solid #eee', display: mapInstanceRef.current ? 'block' : 'none' }} />
+        {contactMapVisible && <Box ref={mapRef} sx={{ height: 300, borderRadius: 2, border: '1px solid #eee', mt: 2, touchAction: 'none' }} />}
       </Section>
 
       {/* 6. Teslimat Bölgeleri (Kademe) */}
       <Section icon="🚩" title="Teslimat Bölgeleri (Kademe)">
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Farklı mesafe kademelerine göre minimum sipariş tutarı belirleyin. Belirtilen yarıçap merkezden (konum) hesaplanır.</Typography>
-        {zones.map((z, i) => (
-          <Stack key={i} direction="row" spacing={2} alignItems="center" sx={{ mb: 1.5, p: 1.5, bgcolor: '#f9fafb', borderRadius: 2 }}>
-            <Typography sx={{ fontWeight: 700, minWidth: 90 }}>{i + 1}. Kademe</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Restoranın konumunu merkez alarak teslimat bölgeleri tanımlayın. Her bölge için minimum sipariş tutarı belirleyin.
+          Bölge dışındaki konumlara teslimat yapılmaz.
+        </Typography>
+        {zones.map((z, i) => {
+          const colors = ['#dc2626', '#f59e0b', '#3b82f6', '#16a34a', '#8b5cf6'];
+          return (
+          <Stack key={i} direction="row" spacing={2} alignItems="center" sx={{ mb: 1.5, p: 1.5, bgcolor: '#f9fafb', borderRadius: 2, borderLeft: `4px solid ${colors[i % colors.length]}` }}>
+            <Typography sx={{ fontWeight: 700, minWidth: 90 }}>{i + 1}. Bölge</Typography>
             <TextField size="small" type="number" label="Yarıçap (km)" value={z.radius} onChange={e => updateZone(i, 'radius', e.target.value)} sx={{ width: 130 }} />
             <TextField size="small" type="number" label="Min. Sepet (TL)" value={z.min_order} onChange={e => updateZone(i, 'min_order', e.target.value)} sx={{ width: 140 }} />
             <Button size="small" color="error" onClick={() => removeZone(i)}>×</Button>
           </Stack>
-        ))}
-        <Button variant="outlined" size="small" onClick={addZone} sx={{ mt: 1 }}>+ Kademe Ekle</Button>
+          );
+        })}
+        <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 2 }}>
+          <Button variant="outlined" size="small" onClick={addZone}>+ Bölge Ekle</Button>
+          <Button variant="outlined" size="small" onClick={initZoneMap} sx={{ color: '#3b82f6' }}>📍 Haritada Göster</Button>
+        </Stack>
+        {zoneMapVisible && <Box ref={zoneMapRef} sx={{ height: 350, borderRadius: 2, border: '1px solid #eee', touchAction: 'none' }} />}
+        {zones.length === 0 && (
+          <Box sx={{ p: 2, bgcolor: '#fef3c7', borderRadius: 2, border: '1px solid #fde68a', mt: 1 }}>
+            <Typography variant="caption" sx={{ color: '#92400e', fontWeight: 600 }}>
+              ⚠️ Henüz teslimat bölgesi tanımlanmadı. Bölge eklemezseniz müşteriler her konumdan sipariş verebilir ve genel minimum sipariş tutarı uygulanır.
+            </Typography>
+          </Box>
+        )}
       </Section>
 
       {/* 7. Çalışma Saatleri */}

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../api/api';
 import toast from 'react-hot-toast';
-import { Box, Typography, Chip, Card, Button, Stack, Divider, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
+import { Box, Typography, Chip, Card, Button, Stack, Divider, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
+import EditIcon from '@mui/icons-material/Edit';
 
 const statusLabels = {
   pending: 'Bekleyen',
@@ -30,6 +31,9 @@ export default function OrderManagement() {
   const [cancelConfirm, setCancelConfirm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(50);
+  const [tables, setTables] = useState([]);
+  const [tableEditOrder, setTableEditOrder] = useState(null);
+  const [selectedTableId, setSelectedTableId] = useState('');
 
   const fetchOrders = useCallback(() => {
     api.get('/admin/orders').then(res => setOrders(res.data));
@@ -42,6 +46,7 @@ export default function OrderManagement() {
   }, [fetchOrders]);
 
   useEffect(() => { api.get('/admin/settings').then(res => setSettings(res.data)); }, []);
+  useEffect(() => { api.get('/admin/tables').then(res => setTables(res.data)); }, []);
 
   // Map old statuses to new ones for filtering
   const mapStatus = (s) => (s === 'confirmed' || s === 'ready') ? 'preparing' : s;
@@ -62,13 +67,22 @@ export default function OrderManagement() {
       await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
       toast.success(`Sipariş ${statusLabels[newStatus]} durumuna güncellendi`);
       // Bekleyenden hazırlamaya geçerken otomatik fiş yazdır
-      if (newStatus === 'preparing' && order) {
+      if (newStatus === 'preparing' && order && settings.receipt_auto_print !== 'false') {
         printReceipt(order);
       }
       fetchOrders();
     } catch {
       toast.error('Güncelleme hatası');
     }
+  };
+
+  const handleTableChange = async (orderId, tableId) => {
+    try {
+      await api.put(`/admin/orders/${orderId}/status`, { table_id: tableId || null });
+      toast.success('Masa güncellendi');
+      fetchOrders();
+      setTableEditOrder(null);
+    } catch { toast.error('Güncelleme hatası'); }
   };
 
   const formatDate = (dateStr) => {
@@ -89,9 +103,12 @@ export default function OrderManagement() {
   const printReceipt = (order) => {
     const items = order.items || [];
     const dateStr = formatDate(order.createdAt);
+    const masaInfo = order.table ? (order.table.table_name ? `${order.table.table_name} (${order.table.table_number})` : order.table.table_number) : '-';
     const type = order.order_type === 'online'
-      ? `ONLINE: ${order.delivery_address || '-'}`
-      : `MASA: ${order.table ? order.table.table_number : '-'}`;
+      ? `🌐 ONLINE SİPARİŞ`
+      : order.table
+        ? `MASA: ${masaInfo}`
+        : `📱 TELEFON SİPARİŞİ`;
     const customer = order.user ? `${order.user.first_name} ${order.user.last_name}` : (order.customer_name || '-');
     const phone = order.user?.phone || order.customer_phone || '';
     const payment = paymentLabel(order.payment_method, order.order_type);
@@ -135,7 +152,8 @@ export default function OrderManagement() {
   <div class="sep"></div>
   ${showOrderNo ? `<div class="bold center" style="font-size:${rFontPx + 2}px">#${order.id}</div>` : ''}
   ${showDate ? `<div class="center" style="font-size:${rFontPx - 2}px">${dateStr.split(' ')[0]}${showTime ? ' ' + dateStr.split(' ')[1] : ''}</div>` : ''}
-  ${showTable ? `<div class="sep"></div><div style="font-size:${rFontPx - 1}px">${type}</div>` : ''}
+  ${showTable ? `<div class="sep"></div><div style="font-size:${rFontPx - 1}px"><b>${type}</b></div>` : ''}
+  ${order.order_note ? `<div style="font-size:${rFontPx - 1}px">📝 Not: ${order.order_note}</div>` : ''}
   <div style="font-size:${rFontPx - 1}px">Müşteri: ${customer}</div>
   ${phone ? `<div style="font-size:${rFontPx - 1}px">Tel: ${phone}</div>` : ''}
   ${order.delivery_address ? `<div style="font-size:${rFontPx - 1}px">Adres: ${order.delivery_address}</div>` : ''}
@@ -144,19 +162,25 @@ export default function OrderManagement() {
   <div class="sep"></div>
   ${showTotal ? `<table><tr><td class="total">TOPLAM:</td><td class="total" style="text-align:right">${parseFloat(order.total_amount).toFixed(2)} TL</td></tr></table><div class="sep"></div>` : ''}
   <div class="center" style="font-size:${rFontPx - 2}px">Ödeme: ${payment}</div>
-  ${order.order_note ? `<div class="center" style="font-size:${rFontPx - 2}px">Not: ${order.order_note}</div>` : ''}
   <div class="sep"></div>
   <div class="center" style="font-size:${rFontPx - 2}px;margin-top:4px">${rFooter}</div>
   <div class="center" style="font-size:${rFontPx - 3}px;margin-top:2px">--- SON ---</div>
 </body></html>`;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
-    document.body.appendChild(iframe);
-    iframe.contentDocument.write(html);
-    iframe.contentDocument.close();
-    iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
-    setTimeout(() => iframe.contentWindow.print(), 200);
+    // Electron varsa popup'sız silent print, yoksa fallback iframe
+    if (window.electronAPI?.isElectron) {
+      window.electronAPI.silentPrint(html)
+        .then(() => console.log('Fiş yazdırıldı (silent)'))
+        .catch(err => console.error('Print hatası:', err));
+    } else {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
+      document.body.appendChild(iframe);
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+      iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+      setTimeout(() => iframe.contentWindow.print(), 200);
+    }
   };
 
   return (
@@ -188,8 +212,16 @@ export default function OrderManagement() {
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                 <Typography sx={{ fontWeight: 800, fontSize: 16 }}>#{order.id} - {formatDate(order.createdAt)}</Typography>
               </Stack>
-              <Chip label={order.order_type === 'online' ? `🌐 Online` : `🪑 Masa${order.table ? ` - Masa ${order.table.table_number}` : ''}`}
-                size="small" sx={{ mb: 1.5, bgcolor: order.order_type === 'online' ? '#dbeafe' : '#fef3c7', fontWeight: 500 }} />
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5 }}>
+                <Chip label={order.order_type === 'online' ? `🌐 Online` : order.table ? `🪑 Masa - ${order.table.table_name || 'Masa ' + order.table.table_number}` : `📱 Telefon`}
+                  size="small" sx={{ bgcolor: order.order_type === 'online' ? '#dbeafe' : order.table ? '#fef3c7' : '#f3e8ff', fontWeight: 500 }} />
+                {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                  <IconButton size="small" onClick={() => { setTableEditOrder(order); setSelectedTableId(order.table_id || ''); }}
+                    title="Masa Düzenle" sx={{ color: '#666', width: 24, height: 24 }}>
+                    <EditIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                )}
+              </Stack>
               {(order.user || order.customer_name) && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   👤 {order.user ? `${order.user.first_name} ${order.user.last_name}` : order.customer_name}
@@ -312,6 +344,26 @@ export default function OrderManagement() {
             variant="contained" color="error" sx={{ fontWeight: 600 }}>
             Evet, İptal Et
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Masa Düzenle Modalı */}
+      <Dialog open={!!tableEditOrder} onClose={() => setTableEditOrder(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Masa Düzenle - #{tableEditOrder?.id}</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth size="small" sx={{ mt: 1 }}>
+            <InputLabel>Masa Seçiniz</InputLabel>
+            <Select value={selectedTableId} onChange={e => setSelectedTableId(e.target.value)} label="Masa Seçiniz">
+              <MenuItem value="">Masa Yok (Telefon Siparişi)</MenuItem>
+              {tables.map(t => (
+                <MenuItem key={t.id} value={t.id}>{t.table_name ? `${t.table_name} (${t.table_number})` : `Masa ${t.table_number}`}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setTableEditOrder(null)} variant="outlined" sx={{ fontWeight: 600 }}>Vazgeç</Button>
+          <Button onClick={() => handleTableChange(tableEditOrder.id, selectedTableId)} variant="contained" sx={{ fontWeight: 600 }}>Kaydet</Button>
         </DialogActions>
       </Dialog>
     </Box>

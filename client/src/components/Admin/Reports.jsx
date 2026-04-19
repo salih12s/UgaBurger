@@ -16,7 +16,6 @@ export default function Reports() {
   const [onlineExpanded, setOnlineExpanded] = useState(false);
   const [tableExpanded, setTableExpanded] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
-  const [creditExpanded, setCreditExpanded] = useState(false);
 
   const fetchReport = () => {
     setLoading(true);
@@ -59,17 +58,6 @@ export default function Reports() {
   const filteredOnlineOrders = filterOrders(onlineOrders);
   const filteredTableOrders = filterOrders(tableOrders);
   const isFiltered = searchFilter.trim() !== '';
-
-  // Açık hesap: pending ödeme durumundaki müşteriler (customer_name bazlı)
-  const creditOrders = (report.orderDetails || []).filter(o => o.customer_name && o.payment_method !== 'online');
-  const creditByCustomer = {};
-  creditOrders.forEach(o => {
-    const name = o.customer_name;
-    if (!creditByCustomer[name]) creditByCustomer[name] = { name, orders: [], total: 0 };
-    creditByCustomer[name].orders.push(o);
-    creditByCustomer[name].total += parseFloat(o.total_amount);
-  });
-  const creditList = Object.values(creditByCustomer).sort((a, b) => b.total - a.total);
 
   const displayTotalOrders = isFiltered ? filteredOnlineOrders.length + filteredTableOrders.length : report.totalOrders;
   const displayTotalRevenue = isFiltered ? [...filteredOnlineOrders, ...filteredTableOrders].reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.totalRevenue);
@@ -189,52 +177,6 @@ export default function Reports() {
           </Box>
         </Collapse>
       </Card>
-
-      {/* Açık Hesaplar */}
-      {creditList.length > 0 && (
-        <Card sx={{ p: 2.5, mb: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center"
-            onClick={() => setCreditExpanded(!creditExpanded)} sx={{ cursor: 'pointer' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              💰 Açık Hesaplar - Müşteri Bazlı ({creditList.length} müşteri)
-            </Typography>
-            <IconButton size="small">{creditExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>
-          </Stack>
-          <Collapse in={creditExpanded}>
-            <Box sx={{ mt: 1.5 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8', fontSize: 12 } }}>
-                    <TableCell>Müşteri</TableCell>
-                    <TableCell>Sipariş Sayısı</TableCell>
-                    <TableCell>Toplam Borç</TableCell>
-                    <TableCell>Siparişler</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {creditList.map((c, i) => (
-                    <TableRow key={i} hover>
-                      <TableCell sx={{ fontWeight: 700 }}>{c.name}</TableCell>
-                      <TableCell>{c.orders.length}</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#dc2626' }}>{c.total.toFixed(2)} ₺</TableCell>
-                      <TableCell>
-                        <Typography variant="caption">
-                          {c.orders.map((o, j) => (
-                            <span key={o.id}>
-                              {j > 0 && ', '}
-                              #{o.id} ({parseFloat(o.total_amount).toFixed(2)}₺)
-                            </span>
-                          ))}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          </Collapse>
-        </Card>
-      )}
 
       {/* Ürün Bazlı Satışlar */}
       <Card sx={{ p: 2.5, mb: 3 }}>

@@ -4,7 +4,9 @@ import api from '../../api/api';
 import ProductCard from './ProductCard';
 import ProductModal from './ProductModal';
 import OrderDialog from '../Cart/OrderDialog';
+import AddressFormDialog from '../Cart/AddressFormDialog';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { Box, Button, Chip, Stack, Typography, Fab, Badge, Alert } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 
@@ -14,9 +16,11 @@ export default function MenuPage() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showOrder, setShowOrder] = useState(false);
+  const [showAddressFirst, setShowAddressFirst] = useState(false);
   const [settings, setSettings] = useState({});
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const { totalItems, totalAmount } = useCart();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,6 +51,27 @@ export default function MenuPage() {
 
   // online_order_active ayarı yoksa varsayılan true kabul et
   const isOnlineActive = (settings.online_order_active !== 'false') && isWithinWorkingHours();
+
+  const handleCartClick = () => {
+    if (!user) { navigate('/login'); return; }
+    const hasAddress = user.addresses && Array.isArray(user.addresses) && user.addresses.length > 0;
+    if (!hasAddress) {
+      setShowAddressFirst(true);
+    } else {
+      setShowOrder(true);
+    }
+  };
+
+  const handleAddressSaved = async (addressData) => {
+    try {
+      const current = user?.addresses && Array.isArray(user.addresses) ? [...user.addresses] : [];
+      current.push(addressData);
+      await api.put('/auth/profile', { addresses: current });
+      if (refreshUser) await refreshUser();
+      setShowAddressFirst(false);
+      setShowOrder(true);
+    } catch { /* toast handled in dialog */ }
+  };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2.5 }}>
@@ -81,7 +106,7 @@ export default function MenuPage() {
       )}
 
       {totalItems > 0 && isOnlineActive && (
-        <Fab variant="extended" onClick={() => setShowOrder(true)}
+        <Fab variant="extended" onClick={handleCartClick}
           sx={{ position: 'fixed', bottom: 24, right: 24, bgcolor: '#dc2626', color: '#fff',
             fontWeight: 700, fontSize: 15, px: 3, '&:hover': { bgcolor: '#b91c1c' },
             boxShadow: '0 4px 20px rgba(220,38,38,0.4)', zIndex: 90 }}>
@@ -91,6 +116,15 @@ export default function MenuPage() {
             <Box />
           </Badge>
         </Fab>
+      )}
+
+      {showAddressFirst && (
+        <AddressFormDialog
+          open={true}
+          onClose={() => setShowAddressFirst(false)}
+          onSave={handleAddressSaved}
+          editAddress={null}
+        />
       )}
 
       {showOrder && isOnlineActive && <OrderDialog onClose={() => setShowOrder(false)} products={products} />}

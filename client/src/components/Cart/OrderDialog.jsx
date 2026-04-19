@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -9,24 +9,64 @@ import {
   LinearProgress, Avatar, Divider, Checkbox, FormControlLabel, Radio, RadioGroup, FormControl
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import CheckIcon from '@mui/icons-material/Check';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import CreditCardIcon from '@mui/icons-material/CreditCard';
+import LockIcon from '@mui/icons-material/Lock';
+import AddressFormDialog from './AddressFormDialog';
+
+// Haversine mesafe hesaplama (km)
+const haversineDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// PayTR iFrame bileşeni
+function PaytrIframe({ token, onSuccess }) {
+  const iframeRef = useRef(null);
+
+  useEffect(() => {
+    // iframeResizer script yükle
+    if (!document.getElementById('paytr-resizer-script')) {
+      const script = document.createElement('script');
+      script.id = 'paytr-resizer-script';
+      script.src = 'https://www.paytr.com/js/iframeResizer.min.js';
+      script.onload = () => {
+        if (window.iFrameResize && iframeRef.current) {
+          window.iFrameResize({}, '#paytriframe');
+        }
+      };
+      document.head.appendChild(script);
+    } else if (window.iFrameResize && iframeRef.current) {
+      window.iFrameResize({}, '#paytriframe');
+    }
+  }, [token]);
+
+  return (
+    <Box sx={{ p: 0, flex: 1 }}>
+      <iframe
+        ref={iframeRef}
+        src={`https://www.paytr.com/odeme/guvenli/${token}`}
+        id="paytriframe"
+        frameBorder="0"
+        scrolling="no"
+        style={{ width: '100%', minHeight: 450, border: 'none' }}
+      />
+    </Box>
+  );
+}
 
 export default function OrderDialog({ onClose, products }) {
   const { items, addItem, updateQuantity, clearCart, totalAmount } = useCart();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [orderNote, setOrderNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({});
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
   const [userAddresses, setUserAddresses] = useState([]);
@@ -35,6 +75,10 @@ export default function OrderDialog({ onClose, products }) {
   const [promoCode, setPromoCode] = useState('');
   const [promoResult, setPromoResult] = useState(null);
   const [promoLoading, setPromoLoading] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [paytrToken, setPaytrToken] = useState(null);
+  const [paytrOrderId, setPaytrOrderId] = useState(null);
 
   useEffect(() => { api.get('/settings').then(res => setSettings(res.data)); }, []);
 
@@ -48,6 +92,28 @@ export default function OrderDialog({ onClose, products }) {
     }
   }, [user]);
 
+  // Adres kaydedilince
+  const handleAddressSaved = async (addressData) => {
+    try {
+      const currentAddresses = user?.addresses && Array.isArray(user.addresses) ? [...user.addresses] : [];
+      if (editingAddress !== null) {
+        currentAddresses[editingAddress] = addressData;
+      } else {
+        currentAddresses.push(addressData);
+      }
+      await api.put('/auth/profile', { addresses: currentAddresses });
+      if (refreshUser) await refreshUser();
+      setUserAddresses(currentAddresses);
+      setSelectedAddressIdx(editingAddress !== null ? editingAddress : currentAddresses.length - 1);
+      setDeliveryAddress(addressData.address);
+      setShowAddressForm(false);
+      setEditingAddress(null);
+      toast.success('Adres kaydedildi!');
+    } catch {
+      toast.error('Adres kaydedilemedi');
+    }
+  };
+
   const handleAddressSelect = (idx) => {
     const i = parseInt(idx);
     setSelectedAddressIdx(i);
@@ -58,7 +124,21 @@ export default function OrderDialog({ onClose, products }) {
     }
   };
 
-  const minOrder = parseFloat(settings.min_order_amount || 1);
+  // Bölge bazlı minimum sipariş tutarı
+  const getZoneMinOrder = useCallback(() => {
+    const zones = settings.delivery_zones ? JSON.parse(settings.delivery_zones) : [];
+    if (zones.length === 0) return parseFloat(settings.min_order_amount || 1);
+    const addr = selectedAddressIdx >= 0 ? userAddresses[selectedAddressIdx] : null;
+    if (!addr?.lat || !addr?.lng || !settings.contact_lat || !settings.contact_lng) {
+      return parseFloat(settings.min_order_amount || 1);
+    }
+    const dist = haversineDistance(addr.lat, addr.lng, parseFloat(settings.contact_lat), parseFloat(settings.contact_lng));
+    const sortedZones = [...zones].sort((a, b) => a.radius - b.radius);
+    const matched = sortedZones.find(z => dist <= z.radius);
+    return matched ? matched.min_order : parseFloat(settings.min_order_amount || 1);
+  }, [settings, selectedAddressIdx, userAddresses]);
+
+  const minOrder = getZoneMinOrder();
   const canOrder = totalAmount >= minOrder;
   const progress = Math.min(100, (totalAmount / minOrder) * 100);
 
@@ -72,9 +152,6 @@ export default function OrderDialog({ onClose, products }) {
     return pool.slice(0, 4);
   })();
 
-  const fmtCard = (v) => { const d = v.replace(/\D/g, '').slice(0, 16); return d.replace(/(.{4})/g, '$1 ').trim(); };
-  const fmtExp = (v) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length >= 3 ? d.slice(0, 2) + '/' + d.slice(2) : d; };
-  const cardValid = () => { const n = cardNumber.replace(/\s/g, ''); return cardName.trim().length >= 3 && n.length === 16 && cardExpiry.length === 5 && cardCvv.length >= 3; };
 
   const handleAddSuggestion = (product) => {
     addItem(product, 1, []);
@@ -101,27 +178,60 @@ export default function OrderDialog({ onClose, products }) {
     if (!user) { toast.error('Sipariş vermek için giriş yapınız'); navigate('/login'); return; }
     const addr = selectedAddressIdx === -1 ? newAddress : deliveryAddress;
     if (!addr.trim()) { toast.error('Teslimat adresini giriniz'); return; }
-    if (!cardValid()) { toast.error('Kart bilgilerini eksiksiz giriniz'); return; }
     if (!kvkkAccepted) { toast.error('Sözleşmeleri kabul etmelisiniz'); return; }
     setLoading(true);
     try {
       const orderItems = items.map(item => ({
         product_id: item.product.id, quantity: item.quantity,
-        extras: item.selectedExtras.map(e => ({ id: e.id, name: e.name, price: e.price })),
+        extras: item.selectedExtras.map(e => ({ id: e.id, name: e.name, price: e.price, quantity: e.quantity || 1 })),
       }));
-      const last4 = cardNumber.replace(/\s/g, '').slice(-4);
-      const res = await api.post('/orders', {
+      const selectedAddr = selectedAddressIdx >= 0 ? userAddresses[selectedAddressIdx] : null;
+      // 1) Sipariş oluştur
+      const orderRes = await api.post('/orders', {
         items: orderItems, order_type: 'online',
         delivery_address: addr,
+        address_lat: selectedAddr?.lat || null,
+        address_lng: selectedAddr?.lng || null,
         order_note: orderNote, payment_method: 'online',
-        card_info: { holder: cardName, last4, expiry: cardExpiry },
         promo_code: promoResult ? promoResult.code : null,
       });
-      setSuccessOrder(res.data);
-      clearCart();
+      const orderId = orderRes.data.id || orderRes.data.order?.id;
+      setPaytrOrderId(orderId);
+      // 2) PayTR token al
+      const tokenRes = await api.post('/paytr/token', { order_id: orderId });
+      setPaytrToken(tokenRes.data.token);
     } catch (err) { toast.error(err.response?.data?.error || 'Sipariş hatası'); }
     finally { setLoading(false); }
   };
+
+  // PayTR iFrame ödeme ekranı
+  if (paytrToken) {
+    return (
+      <Dialog open onClose={() => { setPaytrToken(null); }} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', minHeight: 500 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid #eee' }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <LockIcon sx={{ color: '#16a34a', fontSize: 20 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Güvenli Ödeme</Typography>
+          </Stack>
+          <IconButton size="small" onClick={() => { setPaytrToken(null); }}><CloseIcon /></IconButton>
+        </Box>
+        <PaytrIframe token={paytrToken} onSuccess={() => { clearCart(); setPaytrToken(null); setSuccessOrder({ id: paytrOrderId }); }} />
+      </Dialog>
+    );
+  }
+
+  // Adres formu diyaloğu (sipariş ekranından yeni adres ekleme)
+  if (showAddressForm) {
+    return (
+      <AddressFormDialog
+        open={true}
+        onClose={() => setShowAddressForm(false)}
+        onSave={handleAddressSaved}
+        editAddress={editingAddress !== null ? userAddresses[editingAddress] : null}
+      />
+    );
+  }
 
   // Başarı ekranı
   if (successOrder) {
@@ -198,37 +308,33 @@ export default function OrderDialog({ onClose, products }) {
                         </Stack>
                       </Box>
                     ))}
-                    <Box sx={{ border: 1, borderColor: selectedAddressIdx === -1 ? '#3b82f6' : '#e5e7eb', borderRadius: 2, p: 1.2, cursor: 'pointer', bgcolor: selectedAddressIdx === -1 ? '#eff6ff' : 'transparent' }}
-                      onClick={() => handleAddressSelect(-1)}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Radio value={-1} size="small" sx={{ p: 0.3, '&.Mui-checked': { color: '#3b82f6' } }} />
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>+ Farklı adrese gönder</Typography>
-                      </Stack>
-                    </Box>
                   </RadioGroup>
                 </FormControl>
               )}
-              {(selectedAddressIdx === -1 || userAddresses.length === 0) && (
-                <TextField fullWidth size="small" placeholder="Teslimat adresinizi giriniz..." value={newAddress} onChange={e => { setNewAddress(e.target.value); setDeliveryAddress(e.target.value); }} />
-              )}
+              <Button
+                size="small" variant="outlined" onClick={() => { setEditingAddress(null); setShowAddressForm(true); }}
+                sx={{ fontWeight: 600, textTransform: 'none', borderColor: '#3b82f6', color: '#3b82f6', borderRadius: 2 }}
+              >
+                + Yeni Adres Ekle
+              </Button>
             </Box>
 
-            {/* Kart Bilgileri */}
+            {/* Ödeme Bilgisi */}
             <Box sx={{ mb: 2.5 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: '#3b82f6', fontSize: 13, fontWeight: 700 }}>2</Avatar>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Kart Bilgileri</Typography>
-                <CreditCardIcon sx={{ fontSize: 18, color: '#888' }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Ödeme</Typography>
+                <LockIcon sx={{ fontSize: 18, color: '#16a34a' }} />
               </Stack>
-              <TextField fullWidth size="small" label="Kart Üzerindeki İsim" value={cardName} onChange={e => setCardName(e.target.value)} sx={{ mb: 1.5 }} />
-              <TextField fullWidth size="small" label="Kart Numarası" value={cardNumber} onChange={e => setCardNumber(fmtCard(e.target.value))} placeholder="0000 0000 0000 0000" slotProps={{ htmlInput: { maxLength: 19 } }} sx={{ mb: 1.5 }} />
-              <Stack direction="row" spacing={1.5}>
-                <TextField size="small" label="Son Kullanma" value={cardExpiry} onChange={e => setCardExpiry(fmtExp(e.target.value))} placeholder="AA/YY" slotProps={{ htmlInput: { maxLength: 5 } }} sx={{ flex: 1 }} />
-                <TextField size="small" label="CVV" value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="***" slotProps={{ htmlInput: { maxLength: 4, autoComplete: 'off' } }} type="password" sx={{ flex: 1 }} />
-              </Stack>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                💳 Ödeme, sipariş onaylandıktan sonra işlenecektir.
-              </Typography>
+              <Box sx={{ p: 2, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#16a34a', mb: 0.5 }}>
+                  🔒 Güvenli Ödeme — PayTR
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Siparişi onayladığınızda güvenli ödeme sayfasına yönlendirileceksiniz.
+                  Kart bilgileriniz PayTR altyapısı ile güvenle işlenir.
+                </Typography>
+              </Box>
             </Box>
 
             {/* Sipariş Notu */}
@@ -268,14 +374,14 @@ export default function OrderDialog({ onClose, products }) {
                 {item.product.image_url ? <Box component="img" src={getImageUrl(item.product.image_url)} alt={item.product.name} sx={{ width: 56, height: 56, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🍔</Box>}
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.product.name}</Typography>
-                  {item.selectedExtras.length > 0 && <Typography variant="caption" sx={{ color: '#8b5cf6' }}>+ {item.selectedExtras.map(e => e.name).join(', ')}</Typography>}
+                  {item.selectedExtras.length > 0 && <Typography variant="caption" sx={{ color: '#8b5cf6' }}>+ {item.selectedExtras.map(e => `${(e.quantity || 1) > 1 ? (e.quantity || 1) + 'x ' : ''}${e.name}`).join(', ')}</Typography>}
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
                     <IconButton size="small" onClick={() => updateQuantity(idx, item.quantity - 1)} sx={{ border: 1, borderColor: '#ddd', width: 24, height: 24 }}><RemoveIcon sx={{ fontSize: 14 }} /></IconButton>
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>{item.quantity}</Typography>
                     <IconButton size="small" onClick={() => updateQuantity(idx, item.quantity + 1)} sx={{ border: 1, borderColor: '#ddd', width: 24, height: 24 }}><AddIcon sx={{ fontSize: 14 }} /></IconButton>
                   </Stack>
                 </Box>
-                <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{((parseFloat(item.product.price) + item.selectedExtras.reduce((s, e) => s + parseFloat(e.price), 0)) * item.quantity).toFixed(2)} TL</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{((parseFloat(item.product.price) + item.selectedExtras.reduce((s, e) => s + parseFloat(e.price) * (e.quantity || 1), 0)) * item.quantity).toFixed(2)} TL</Typography>
               </Stack>
             ))}
             <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
@@ -329,9 +435,9 @@ export default function OrderDialog({ onClose, products }) {
               sx={{ mt: 1, mb: 1 }}
             />
             <Button fullWidth variant="contained" onClick={handleConfirm} disabled={loading || !canOrder || !kvkkAccepted}
-              endIcon={!loading && <CheckIcon />}
-              sx={{ mt: 1, py: 1.8, bgcolor: '#333', fontWeight: 700, fontSize: 15, '&:hover': { bgcolor: '#111' }, '&:disabled': { bgcolor: '#999' } }}>
-              {loading ? 'İşleniyor...' : 'Siparişi Onayla'}
+              endIcon={!loading && <LockIcon />}
+              sx={{ mt: 1, py: 1.8, bgcolor: '#16a34a', fontWeight: 700, fontSize: 15, '&:hover': { bgcolor: '#15803d' }, '&:disabled': { bgcolor: '#999' } }}>
+              {loading ? 'İşleniyor...' : 'Güvenli Ödemeye Geç'}
             </Button>
           </Box>
         </Box>

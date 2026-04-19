@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { CircularProgress, Box } from '@mui/material';
+import { CircularProgress, Box, Typography } from '@mui/material';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import theme from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -17,6 +17,27 @@ import ResetPasswordPage from './components/Auth/ResetPasswordPage';
 import MenuPage from './components/Menu/MenuPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import AdminLayout from './components/Admin/AdminLayout';
+
+// PayTR ödeme sonuç sayfaları (iframe içinde gösterilir)
+function PaymentSuccess() {
+  return (
+    <Box sx={{ textAlign: 'center', py: 8, px: 3 }}>
+      <Typography sx={{ fontSize: 56, mb: 2 }}>✅</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 800, color: '#16a34a', mb: 1 }}>Ödeme Başarılı!</Typography>
+      <Typography variant="body2" color="text.secondary">Siparişiniz onaylandı. Bu pencere kısa süre içinde kapanacaktır.</Typography>
+    </Box>
+  );
+}
+
+function PaymentFail() {
+  return (
+    <Box sx={{ textAlign: 'center', py: 8, px: 3 }}>
+      <Typography sx={{ fontSize: 56, mb: 2 }}>❌</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 800, color: '#dc2626', mb: 1 }}>Ödeme Başarısız</Typography>
+      <Typography variant="body2" color="text.secondary">Ödemeniz işlenemedi. Lütfen tekrar deneyin.</Typography>
+    </Box>
+  );
+}
 
 function ProtectedAdmin({ children }) {
   const { user, loading } = useAuth();
@@ -37,6 +58,8 @@ function AppRoutes() {
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
       <Route path="/profile" element={user ? <><Navbar /><ProfilePage /><Footer /></> : <Navigate to="/login" />} />
+      <Route path="/odeme-basarili" element={<PaymentSuccess />} />
+      <Route path="/odeme-hatasi" element={<PaymentFail />} />
       <Route path="/admin/*" element={<ProtectedAdmin><AdminLayout /></ProtectedAdmin>} />
     </Routes>
   );

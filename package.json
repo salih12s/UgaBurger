@@ -2,6 +2,7 @@
   "name": "ugaburger",
   "version": "1.0.0",
   "description": "Uga Burger Online Sipariş Sistemi",
+  "main": "electron/main.js",
   "scripts": {
     "start": "cd server && node server.js",
     "build": "cd server && npm install",
@@ -11,9 +12,14 @@
     "client": "cd client && npm run dev",
     "dev": "npx concurrently \"npm run server:dev\" \"npm run client\"",
     "seed": "cd server && node seeds/seed.js",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "electron:dev": "npx concurrently \"npm run server:dev\" \"npm run client\" \"npx wait-on http://localhost:5173 && npx electron . --dev\"",
+    "electron:build": "cd client && npm run build && cd .. && npx electron .",
+    "electron:start": "npx electron ."
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "electron": "^41.2.1",
+    "wait-on": "^9.0.5"
   }
 }

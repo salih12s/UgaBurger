@@ -4,13 +4,38 @@ const sequelize = require('../config/db');
 const createOrder = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { items, order_type, table_id, delivery_address, order_note, payment_method, card_info } = req.body;
+    const { items, order_type, table_id, delivery_address, order_note, payment_method, card_info, address_lat, address_lng } = req.body;
 
     // Online sipariş kapalıysa engelle
     const onlineSetting = await Setting.findOne({ where: { key: 'online_order_active' } });
     if (onlineSetting && onlineSetting.value !== 'true') {
       await t.rollback();
       return res.status(403).json({ error: 'Online sipariş şu anda kapalıdır.' });
+    }
+
+    // Teslimat bölgesi kontrolü
+    if (address_lat && address_lng) {
+      const [zoneSetting, latSetting, lngSetting] = await Promise.all([
+        Setting.findOne({ where: { key: 'delivery_zones' } }),
+        Setting.findOne({ where: { key: 'contact_lat' } }),
+        Setting.findOne({ where: { key: 'contact_lng' } }),
+      ]);
+      const zones = zoneSetting ? JSON.parse(zoneSetting.value) : [];
+      if (zones.length > 0 && latSetting && lngSetting) {
+        const storeLat = parseFloat(latSetting.value);
+        const storeLng = parseFloat(lngSetting.value);
+        const R = 6371;
+        const dLat = (storeLat - address_lat) * Math.PI / 180;
+        const dLon = (storeLng - address_lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(address_lat * Math.PI / 180) * Math.cos(storeLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const sortedZones = [...zones].sort((a, b) => a.radius - b.radius);
+        const matchedZone = sortedZones.find(z => dist <= z.radius);
+        if (!matchedZone) {
+          await t.rollback();
+          return res.status(400).json({ error: 'Teslimat adresiniz teslimat bölgemizin dışında kalmaktadır.' });
+        }
+      }
     }
 
     if (!items || items.length === 0) {
@@ -31,7 +56,7 @@ const createOrder = async (req, res) => {
       let itemTotal = parseFloat(product.price) * item.quantity;
       const extras = item.extras || [];
       for (const extra of extras) {
-        itemTotal += parseFloat(extra.price) * item.quantity;
+        itemTotal += parseFloat(extra.price) * (extra.quantity || 1) * item.quantity;
       }
 
       total_amount += itemTotal;

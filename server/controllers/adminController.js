@@ -31,8 +31,9 @@ const updateOrderStatus = async (req, res) => {
     const order = await Order.findByPk(req.params.id);
     if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı' });
 
-    const { status } = req.body;
-    order.status = status;
+    const { status, table_id } = req.body;
+    if (status) order.status = status;
+    if (table_id !== undefined) order.table_id = table_id || null;
 
     // Payment: charge on confirm, fail on cancel
     if (status === 'confirmed' && order.card_info) {
