@@ -175,6 +175,7 @@ export default function TableOrders() {
   };
 
   const submitQuickOrder = async () => {
+    if (!selectedTable) { toast.error('Masa seçiniz'); return; }
     if (cartItems.length === 0) { toast.error('Ürün seçiniz'); return; }
     try {
       const res = await api.post('/admin/quick-order', {
@@ -238,9 +239,8 @@ export default function TableOrders() {
         <Card sx={{ p: 2, alignSelf: 'flex-start', position: 'sticky', top: 16, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto' }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>🛒 Sipariş</Typography>
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel>Masa seçiniz (opsiyonel)</InputLabel>
-            <Select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} label="Masa seçiniz (opsiyonel)">
-              <MenuItem value="">Seçilmedi</MenuItem>
+            <InputLabel>Masa seçiniz</InputLabel>
+            <Select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} label="Masa seçiniz">
               {tables.map(t => <MenuItem key={t.id} value={t.id}>{t.table_name ? `${t.table_name} (${t.table_number})` : `Masa ${t.table_number}`}</MenuItem>)}
             </Select>
           </FormControl>

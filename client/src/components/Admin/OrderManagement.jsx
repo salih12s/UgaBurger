@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api/api';
 import toast from 'react-hot-toast';
 import { Box, Typography, Chip, Card, Button, Stack, Divider, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
@@ -14,7 +14,9 @@ const statusLabels = {
 
 const nextStatus = {
   pending: 'preparing',
+  confirmed: 'delivered',
   preparing: 'delivered',
+  ready: 'delivered',
 };
 
 const statusColors = {
@@ -35,9 +37,42 @@ export default function OrderManagement() {
   const [tableEditOrder, setTableEditOrder] = useState(null);
   const [selectedTableId, setSelectedTableId] = useState('');
 
-  const fetchOrders = useCallback(() => {
-    api.get('/admin/orders').then(res => setOrders(res.data));
+  const prevOrderCount = useRef(null);
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playBeep = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      // 3 kez bip sesi
+      playBeep(880, ctx.currentTime, 0.15);
+      playBeep(880, ctx.currentTime + 0.2, 0.15);
+      playBeep(1175, ctx.currentTime + 0.4, 0.3);
+    } catch (e) {}
   }, []);
+
+  const fetchOrders = useCallback(() => {
+    api.get('/admin/orders').then(res => {
+      const newOrders = res.data;
+      const newPendingCount = newOrders.filter(o => o.status === 'pending').length;
+      if (prevOrderCount.current !== null && newPendingCount > prevOrderCount.current) {
+        playNotificationSound();
+        toast.success('🔔 Yeni sipariş geldi!', { duration: 5000 });
+      }
+      prevOrderCount.current = newPendingCount;
+      setOrders(newOrders);
+    });
+  }, [playNotificationSound]);
 
   useEffect(() => {
     fetchOrders();
