@@ -39,26 +39,39 @@ export default function OrderManagement() {
   const [selectedOrders, setSelectedOrders] = useState([]);
 
   const prevOrderCount = useRef(null);
+  const notificationAudio = useRef(null);
+  const audioUnlocked = useRef(false);
+
+  // Ses dosyasını önceden yükle
+  useEffect(() => {
+    notificationAudio.current = new Audio('/notification.wav');
+    notificationAudio.current.volume = 1.0;
+    notificationAudio.current.load();
+
+    // Kullanıcı ilk etkileşimde sesi unlock et
+    const unlockAudio = () => {
+      if (!audioUnlocked.current && notificationAudio.current) {
+        notificationAudio.current.play().then(() => {
+          notificationAudio.current.pause();
+          notificationAudio.current.currentTime = 0;
+          audioUnlocked.current = true;
+        }).catch(() => {});
+      }
+    };
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
 
   const playNotificationSound = useCallback(() => {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playBeep = (freq, startTime, duration) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        osc.type = 'sine';
-        gain.gain.setValueAtTime(0.3, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-      };
-      // 3 kez bip sesi
-      playBeep(880, ctx.currentTime, 0.15);
-      playBeep(880, ctx.currentTime + 0.2, 0.15);
-      playBeep(1175, ctx.currentTime + 0.4, 0.3);
+      if (notificationAudio.current) {
+        notificationAudio.current.currentTime = 0;
+        notificationAudio.current.play().catch(() => {});
+      }
     } catch (e) {}
   }, []);
 
@@ -268,7 +281,7 @@ export default function OrderManagement() {
           {selectedOrders.filter(id => filteredOrders.some(o => o.id === id)).length > 0 && (
             <Button size="small" variant="contained" color="success" onClick={handleBulkStatusChange}
               sx={{ fontWeight: 600, fontSize: 12 }}>
-              Seçilenleri Güncelle ({selectedOrders.filter(id => filteredOrders.some(o => o.id === id)).length})
+              {activeStatus === 'preparing' ? '✅ Seçilenleri Teslim Et' : activeStatus === 'pending' ? '→ Seçilenleri Onayla' : 'Seçilenleri Güncelle'} ({selectedOrders.filter(id => filteredOrders.some(o => o.id === id)).length})
             </Button>
           )}
         </Stack>
@@ -362,7 +375,7 @@ export default function OrderManagement() {
                 {nextStatus[order.status] && (
                   <Button size="small" variant="contained" color="success" onClick={() => handleStatusChange(order.id, nextStatus[order.status], order)}
                     sx={{ fontWeight: 600, fontSize: 12 }}>
-                    → {statusLabels[nextStatus[order.status]]}
+                    {order.status === 'pending' ? '✅ Onayla' : order.status === 'preparing' || order.status === 'confirmed' ? '🚀 Teslim Et' : `→ ${statusLabels[nextStatus[order.status]]}`}
                   </Button>
                 )}
                 {order.status !== 'cancelled' && order.status !== 'delivered' && (

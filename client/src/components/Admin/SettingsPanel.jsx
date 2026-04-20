@@ -123,6 +123,7 @@ export default function SettingsPanel() {
       ['closed_banner_color', s('closed_banner_color','#427cf0')],
       ['closed_banner_icon', s('closed_banner_icon','❤️')],
       ['hero_title', s('hero_title','Taş Devrinden Gelen Lezzet')],
+      ['hero_image', s('hero_image','')],
       ['hero_overlay', s('hero_overlay','60')],
       ['hero_text_color', s('hero_text_color','#FFFFFF')],
       ['hero_text_size', s('hero_text_size','medium')],

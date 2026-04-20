@@ -227,10 +227,11 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
       toast.error('Bu konuma teslimat yapılamamaktadır. Lütfen teslimat bölgesi içinde bir konum seçin.');
       return;
     }
-    if (!city.trim()) return;
-    if (!district.trim()) return;
-    if (!neighborhood.trim()) return;
-    if (!street.trim()) return;
+    if (!city.trim()) { toast.error('İl seçiniz'); return; }
+    if (!district.trim()) { toast.error('İlçe seçiniz'); return; }
+    if (!neighborhood.trim()) { toast.error('Mahalle seçiniz'); return; }
+    if (!street.trim()) { toast.error('Cadde/Sokak giriniz'); return; }
+    if (!phone.trim()) { toast.error('Telefon numarası zorunludur'); return; }
 
     const addressData = {
       title: addrTitle,
@@ -454,7 +455,7 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
         {/* Kaydet */}
         <Button
           fullWidth variant="contained" onClick={handleSave}
-          disabled={!city || !district || !neighborhood || !street || zoneInfo?.outside}
+          disabled={!city || !district || !neighborhood || !street || !phone.trim() || zoneInfo?.outside}
           sx={{
             py: 1.5, fontWeight: 700, fontSize: 16, borderRadius: 3,
             bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' },

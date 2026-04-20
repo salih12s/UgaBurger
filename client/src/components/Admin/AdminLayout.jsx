@@ -6,6 +6,7 @@ import TableOrders from './TableOrders';
 import MenuManagement from './MenuManagement';
 import Reports from './Reports';
 import SettingsPanel from './SettingsPanel';
+import UserManagement from './UserManagement';
 import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Typography,
   IconButton, useMediaQuery, useTheme
@@ -18,11 +19,13 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PublicIcon from '@mui/icons-material/Public';
 import MenuIcon from '@mui/icons-material/Menu';
+import PeopleIcon from '@mui/icons-material/People';
 
 const tabs = [
   { id: 'orders', label: 'Siparişler', icon: <ShoppingBagIcon /> },
   { id: 'tables', label: 'Masa / Hızlı Sipariş', icon: <GridViewIcon /> },
   { id: 'menu', label: 'Menü Yönetimi', icon: <ListAltIcon /> },
+  { id: 'users', label: 'Üyeler', icon: <PeopleIcon /> },
   { id: 'reports', label: 'Raporlar', icon: <BarChartIcon /> },
   { id: 'settings', label: 'Ayarlar', icon: <SettingsIcon /> },
 ];
@@ -94,6 +97,7 @@ export default function AdminLayout() {
         {activeTab === 'orders' && <OrderManagement />}
         {activeTab === 'tables' && <TableOrders />}
         {activeTab === 'menu' && <MenuManagement />}
+        {activeTab === 'users' && <UserManagement />}
         {activeTab === 'reports' && <Reports />}
         {activeTab === 'settings' && <SettingsPanel />}
       </Box>

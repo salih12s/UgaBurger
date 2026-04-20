@@ -139,9 +139,9 @@ const paytrCallback = async (req, res) => {
     if (status === 'success') {
       await order.update({
         payment_status: 'paid',
-        status: 'confirmed',
+        status: 'pending',
       });
-      console.log(`Sipariş #${order.id} ödeme başarılı (PayTR)`);
+      console.log(`Sipariş #${order.id} ödeme başarılı (PayTR) - Bekleyene düştü`);
     } else {
       await order.update({
         payment_status: 'failed',

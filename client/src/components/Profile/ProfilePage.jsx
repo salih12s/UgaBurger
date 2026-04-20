@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/api';
 import {
-  Box, Typography, Card, Stack, Chip, Divider, CircularProgress, Avatar, TextField, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
+  Box, Typography, Card, Stack, Chip, Divider, CircularProgress, Avatar, IconButton
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import EditIcon from '@mui/icons-material/Edit';
@@ -12,6 +12,8 @@ import HomeIcon from '@mui/icons-material/Home';
 import WorkIcon from '@mui/icons-material/Work';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import toast from 'react-hot-toast';
+import AddressFormDialog from '../Cart/AddressFormDialog';
+import { Button } from '@mui/material';
 
 const statusLabels = {
   pending: 'Bekleyen', confirmed: 'Onaylanan', preparing: 'Hazırlanıyor',
@@ -31,8 +33,7 @@ export default function ProfilePage() {
   const [addresses, setAddresses] = useState([]);
   const [addrDialog, setAddrDialog] = useState(false);
   const [editIdx, setEditIdx] = useState(-1);
-  const [addrTitle, setAddrTitle] = useState('');
-  const [addrText, setAddrText] = useState('');
+  const [editAddress, setEditAddress] = useState(null);
 
   useEffect(() => {
     api.get('/orders/my').then(res => { setOrders(res.data); setLoading(false); }).catch(() => setLoading(false));
@@ -55,16 +56,15 @@ export default function ProfilePage() {
     }
   };
 
-  const openAddDialog = () => { setEditIdx(-1); setAddrTitle(''); setAddrText(''); setAddrDialog(true); };
-  const openEditDialog = (idx) => { setEditIdx(idx); setAddrTitle(addresses[idx].title); setAddrText(addresses[idx].address); setAddrDialog(true); };
+  const openAddDialog = () => { setEditIdx(-1); setEditAddress(null); setAddrDialog(true); };
+  const openEditDialog = (idx) => { setEditIdx(idx); setEditAddress(addresses[idx]); setAddrDialog(true); };
 
-  const handleSaveAddr = () => {
-    if (!addrTitle.trim() || !addrText.trim()) { toast.error('Başlık ve adres giriniz'); return; }
+  const handleSaveAddr = (addressData) => {
     const newList = [...addresses];
     if (editIdx >= 0) {
-      newList[editIdx] = { title: addrTitle.trim(), address: addrText.trim() };
+      newList[editIdx] = addressData;
     } else {
-      newList.push({ title: addrTitle.trim(), address: addrText.trim() });
+      newList.push(addressData);
     }
     saveAddresses(newList);
     setAddrDialog(false);
@@ -136,25 +136,13 @@ export default function ProfilePage() {
         </Box>
       </Card>
 
-      {/* Address Add/Edit Dialog */}
-      <Dialog open={addrDialog} onClose={() => setAddrDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>{editIdx >= 0 ? 'Adresi Düzenle' : 'Yeni Adres Ekle'}</DialogTitle>
-        <DialogContent>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Adres Başlığı</Typography>
-          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-            {['Ev', 'İş', 'Diğer'].map(t => (
-              <Chip key={t} label={t} variant={addrTitle === t ? 'filled' : 'outlined'} onClick={() => setAddrTitle(t)}
-                sx={{ fontWeight: 600, ...(addrTitle === t ? { bgcolor: '#3b82f6', color: '#fff' } : {}) }} />
-            ))}
-          </Stack>
-          <TextField fullWidth size="small" label="Başlık" value={addrTitle} onChange={e => setAddrTitle(e.target.value)} sx={{ mb: 2 }} />
-          <TextField fullWidth size="small" label="Adres" multiline rows={2} value={addrText} onChange={e => setAddrText(e.target.value)} placeholder="Mahalle, sokak, bina no, daire..." />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setAddrDialog(false)}>İptal</Button>
-          <Button variant="contained" onClick={handleSaveAddr} sx={{ fontWeight: 600 }}>Kaydet</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Address Add/Edit Dialog - Uses the full map-based AddressFormDialog */}
+      <AddressFormDialog
+        open={addrDialog}
+        onClose={() => setAddrDialog(false)}
+        onSave={handleSaveAddr}
+        editAddress={editAddress}
+      />
 
       {/* Order History */}
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Geçmiş Siparişlerim</Typography>

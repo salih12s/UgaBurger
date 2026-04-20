@@ -40,6 +40,9 @@ router.post('/upload', ctrl.upload.single('image'), ctrl.uploadImage);
 // Reports
 router.get('/reports/daily', ctrl.getDailyReport);
 
+// Users
+router.get('/users', ctrl.getAllUsers);
+
 // Settings
 router.get('/settings', ctrl.getSettings);
 router.put('/settings', ctrl.updateSetting);

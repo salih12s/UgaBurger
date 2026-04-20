@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/api';
 import {
   AppBar, Toolbar, Typography, Button, IconButton, Box, Drawer, List, ListItemButton, ListItemText, Divider
 } from '@mui/material';
@@ -11,6 +12,14 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [siteSettings, setSiteSettings] = useState({});
+
+  useEffect(() => {
+    api.get('/settings').then(res => setSiteSettings(res.data)).catch(() => {});
+  }, []);
+
+  const siteIcon = siteSettings.site_icon || '🍔';
+  const siteName = siteSettings.site_name || 'UGA BURGER';
 
   const handleLogout = () => {
     logout();
@@ -25,7 +34,7 @@ export default function Navbar() {
           component={Link} to="/"
           sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 800, fontSize: 18, color: '#dc2626', textTransform: 'uppercase', textDecoration: 'none' }}
         >
-          <span style={{ fontSize: 22 }}>🍔</span> UGA BURGER
+          <span style={{ fontSize: 22 }}>{siteIcon}</span> {siteName}
         </Typography>
 
         {/* Desktop */}

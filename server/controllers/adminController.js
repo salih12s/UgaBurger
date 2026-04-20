@@ -378,6 +378,30 @@ const getDailyReport = async (req, res) => {
   }
 };
 
+// --- USER MANAGEMENT ---
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'addresses', 'created_at'],
+      order: [['created_at', 'DESC']],
+    });
+    // Count orders per user
+    const usersWithStats = await Promise.all(users.map(async (u) => {
+      const orderCount = await Order.count({ where: { user_id: u.id } });
+      const totalSpent = await Order.sum('total_amount', { where: { user_id: u.id, status: { [Op.notIn]: ['cancelled'] } } }) || 0;
+      return {
+        ...u.toJSON(),
+        addresses: u.addresses ? (typeof u.addresses === 'string' ? JSON.parse(u.addresses) : u.addresses) : [],
+        order_count: orderCount,
+        total_spent: totalSpent,
+      };
+    }));
+    res.json(usersWithStats);
+  } catch (err) {
+    res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
+  }
+};
+
 // --- SETTINGS ---
 const getSettings = async (req, res) => {
   try {
@@ -446,6 +470,7 @@ module.exports = {
   getExtras, createExtra, updateExtra, deleteExtra,
   upload, uploadImage,
   getDailyReport,
+  getAllUsers,
   getSettings, updateSetting,
   getPromoCodes, createPromoCode, updatePromoCode, deletePromoCode,
 };
