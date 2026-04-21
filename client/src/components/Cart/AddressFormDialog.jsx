@@ -400,7 +400,7 @@ export default function AddressFormDialog({ open, onClose, onSave, editAddress }
 
         {/* Cadde/Sokak */}
         <TextField
-          fullWidth size="small" label="Cadde/Sokak" value={street}
+          fullWidth size="small" label="Cadde/Sokak *" value={street}
           onChange={e => setStreet(e.target.value)}
           sx={{ mb: 1.5 }}
         />

@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
 const { Order, OrderItem, Product, User, Table, Category, Extra, ProductExtra, Setting, PromoCode } = require('../models');
+const { refundPaytrPayment } = require('./paytrController');
 const multer = require('multer');
 const path = require('path');
 
@@ -39,14 +40,34 @@ const updateOrderStatus = async (req, res) => {
     if (status === 'confirmed' && order.card_info) {
       order.payment_status = 'paid';
     }
+
+    // İptal ediliyorsa ve online ödeme alınmışsa otomatik PayTR iadesi
+    let refundInfo = null;
     if (status === 'cancelled') {
-      order.payment_status = 'failed';
+      if (order.payment_method === 'online' && order.payment_status === 'paid' && order.merchant_oid) {
+        try {
+          await refundPaytrPayment(order.merchant_oid, parseFloat(order.total_amount));
+          order.payment_status = 'refunded';
+          order.refund_amount = parseFloat(order.total_amount);
+          order.refunded_at = new Date();
+          refundInfo = { refunded: true, amount: parseFloat(order.total_amount) };
+        } catch (refundErr) {
+          console.error('Otomatik iade hatası:', refundErr.message);
+          await order.save();
+          return res.status(502).json({
+            error: 'Sipariş iptal edilemedi: iade başarısız - ' + refundErr.message,
+            refund_failed: true,
+          });
+        }
+      } else if (order.payment_status !== 'paid') {
+        order.payment_status = 'failed';
+      }
     }
 
     await order.save();
-    res.json(order);
+    res.json({ ...order.toJSON(), refund: refundInfo });
   } catch (err) {
-    res.status(500).json({ error: 'Sunucu hatası' });
+    res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
   }
 };
 
@@ -87,7 +108,7 @@ const createQuickOrder = async (req, res) => {
       order_note: order_note || '',
       status: 'preparing',
       payment_status: payment_method === 'card' ? 'paid' : 'pending',
-      payment_method: payment_method === 'card' ? 'online' : 'door',
+      payment_method: payment_method === 'card' ? 'card' : 'door',
       customer_name: customer_name || null,
       customer_phone: customer_phone || null,
     }, { transaction: t });

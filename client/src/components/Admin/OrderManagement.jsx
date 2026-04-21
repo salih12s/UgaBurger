@@ -41,12 +41,22 @@ export default function OrderManagement() {
   const prevOrderCount = useRef(null);
   const notificationAudio = useRef(null);
   const audioUnlocked = useRef(false);
+  const titleFlickerRef = useRef(null);
 
-  // Ses dosyasını önceden yükle
+  // Ses dosyasını önceden yükle + browser notification izni iste
   useEffect(() => {
     notificationAudio.current = new Audio('/notification.wav');
     notificationAudio.current.volume = 1.0;
     notificationAudio.current.load();
+
+    // Browser notification izni iste
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    // sessionStorage'dan önceki pending sayısını al (sayfa yenilenince ses kaybolmasın)
+    const stored = sessionStorage.getItem('pendingOrderCount');
+    if (stored !== null) prevOrderCount.current = parseInt(stored, 10);
 
     // Kullanıcı ilk etkileşimde sesi unlock et
     const unlockAudio = () => {
@@ -58,21 +68,54 @@ export default function OrderManagement() {
         }).catch(() => {});
       }
     };
-    document.addEventListener('click', unlockAudio, { once: true });
-    document.addEventListener('keydown', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
     return () => {
       document.removeEventListener('click', unlockAudio);
       document.removeEventListener('keydown', unlockAudio);
+      if (titleFlickerRef.current) clearInterval(titleFlickerRef.current);
     };
+  }, []);
+
+  const flickerTitle = useCallback(() => {
+    if (titleFlickerRef.current) clearInterval(titleFlickerRef.current);
+    const originalTitle = document.title.replace(/^🔔 /, '');
+    let toggled = false;
+    titleFlickerRef.current = setInterval(() => {
+      document.title = toggled ? originalTitle : '🔔 YENİ SİPARİŞ!';
+      toggled = !toggled;
+    }, 800);
+    // Sekmeye dönüldüğünde başlığı resetle
+    const onFocus = () => {
+      clearInterval(titleFlickerRef.current);
+      document.title = originalTitle;
+      window.removeEventListener('focus', onFocus);
+    };
+    window.addEventListener('focus', onFocus);
   }, []);
 
   const playNotificationSound = useCallback(() => {
     try {
       if (notificationAudio.current) {
         notificationAudio.current.currentTime = 0;
-        notificationAudio.current.play().catch(() => {});
+        const p = notificationAudio.current.play();
+        if (p && p.catch) p.catch(() => {});
       }
-    } catch (e) {}
+    } catch { /* noop */ }
+  }, []);
+
+  const showBrowserNotification = useCallback((count) => {
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const n = new Notification('🔔 Yeni Sipariş!', {
+          body: `${count} yeni bekleyen sipariş var`,
+          icon: '/favicon.png',
+          tag: 'new-order',
+          requireInteraction: false,
+        });
+        setTimeout(() => n.close(), 8000);
+      }
+    } catch { /* noop */ }
   }, []);
 
   const fetchOrders = useCallback(() => {
@@ -80,13 +123,17 @@ export default function OrderManagement() {
       const newOrders = res.data;
       const newPendingCount = newOrders.filter(o => o.status === 'pending').length;
       if (prevOrderCount.current !== null && newPendingCount > prevOrderCount.current) {
+        const diff = newPendingCount - prevOrderCount.current;
         playNotificationSound();
-        toast.success('🔔 Yeni sipariş geldi!', { duration: 5000 });
+        showBrowserNotification(newPendingCount);
+        flickerTitle();
+        toast.success(`🔔 ${diff} yeni sipariş geldi!`, { duration: 6000 });
       }
       prevOrderCount.current = newPendingCount;
+      sessionStorage.setItem('pendingOrderCount', String(newPendingCount));
       setOrders(newOrders);
     });
-  }, [playNotificationSound]);
+  }, [playNotificationSound, showBrowserNotification, flickerTitle]);
 
   useEffect(() => {
     fetchOrders();
@@ -113,15 +160,19 @@ export default function OrderManagement() {
 
   const handleStatusChange = async (orderId, newStatus, order) => {
     try {
-      await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
-      toast.success(`Sipariş ${statusLabels[newStatus]} durumuna güncellendi`);
+      const res = await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
+      if (newStatus === 'cancelled' && res.data?.refund?.refunded) {
+        toast.success(`Sipariş iptal edildi ve ${res.data.refund.amount.toFixed(2)} TL iade başlatıldı`, { duration: 6000 });
+      } else {
+        toast.success(`Sipariş ${statusLabels[newStatus]} durumuna güncellendi`);
+      }
       // Bekleyenden hazırlamaya geçerken otomatik fiş yazdır
       if (newStatus === 'preparing' && order && settings.receipt_auto_print !== 'false') {
         printReceipt(order);
       }
       fetchOrders();
-    } catch {
-      toast.error('Güncelleme hatası');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Güncelleme hatası');
     }
   };
 
@@ -161,14 +212,17 @@ export default function OrderManagement() {
   };
 
   const paymentLabel = (m, type) => {
-    if (m === 'online') return '💳 Kart (Online)';
+    // Masa siparişi: fiziksel POS veya nakit
     if (type === 'table') {
-      return m === 'door' ? '💵 Nakit' : '💳 Kart';
+      if (m === 'online' || m === 'card') return '💳 Kart (POS)';
+      return '💵 Nakit';
     }
+    // Online sipariş
+    if (m === 'online') return '💳 Kart (Online)';
     return m === 'door' ? '💵 Kapıda Nakit' : '💳 Kapıda Kart';
   };
-  const paymentStatusLabel = (s) => s === 'paid' ? 'Ödendi' : s === 'failed' ? 'Başarısız' : 'Bekliyor';
-  const paymentStatusColor = (s) => s === 'paid' ? '#16a34a' : s === 'failed' ? '#dc2626' : '#f59e0b';
+  const paymentStatusLabel = (s) => s === 'paid' ? 'Ödendi' : s === 'refunded' ? 'İade Edildi' : s === 'failed' ? 'Başarısız' : 'Bekliyor';
+  const paymentStatusColor = (s) => s === 'paid' ? '#16a34a' : s === 'refunded' ? '#8b5cf6' : s === 'failed' ? '#dc2626' : '#f59e0b';
 
   const printReceipt = (order) => {
     const items = order.items || [];
@@ -210,13 +264,22 @@ export default function OrderManagement() {
 <style>
   @page { size: 80mm auto; margin: 2mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: ${rFontPx}px; width: 76mm; }
+  body {
+    font-family: 'Arial Black', 'Helvetica', Arial, sans-serif;
+    font-size: ${rFontPx + 1}px;
+    width: 76mm;
+    font-weight: 900;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    letter-spacing: 0.3px;
+  }
   .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .sep { border-top: 1px dashed #000; margin: 4px 0; }
+  .bold { font-weight: 900; }
+  .sep { border-top: 2px solid #000; margin: 5px 0; }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 1px 0; vertical-align: top; }
-  .total { font-size: ${rFontPx + 4}px; font-weight: bold; }
+  td { padding: 2px 0; vertical-align: top; font-weight: 900; }
+  .total { font-size: ${rFontPx + 6}px; font-weight: 900; }
 </style></head><body>
   <div class="center bold" style="font-size:${rFontPx + 6}px;margin-bottom:2px">${rTitle}</div>
   <div class="sep"></div>
@@ -351,10 +414,12 @@ export default function OrderManagement() {
               <Divider sx={{ mb: 1 }} />
               <Stack spacing={0.5} sx={{ mb: 1.5 }}>
                 <Typography variant="caption">Ödeme: <b>{paymentLabel(order.payment_method, order.order_type)}</b></Typography>
-                <Typography variant="caption">
-                  Ödeme Durumu: <Chip label={paymentStatusLabel(order.payment_status)} size="small"
-                    sx={{ fontSize: 10, fontWeight: 700, bgcolor: paymentStatusColor(order.payment_status), color: '#fff', height: 20 }} />
-                </Typography>
+                {order.order_type !== 'table' && (
+                  <Typography variant="caption">
+                    Ödeme Durumu: <Chip label={paymentStatusLabel(order.payment_status)} size="small"
+                      sx={{ fontSize: 10, fontWeight: 700, bgcolor: paymentStatusColor(order.payment_status), color: '#fff', height: 20 }} />
+                  </Typography>
+                )}
                 {order.order_note && (
                   <Typography variant="caption">📝 Not: {order.order_note}</Typography>
                 )}
@@ -426,6 +491,16 @@ export default function OrderManagement() {
               <Typography sx={{ fontWeight: 800, fontSize: 16, color: '#dc2626', mt: 1 }}>
                 Toplam: {parseFloat(cancelConfirm.total_amount).toFixed(2)} TL
               </Typography>
+              {cancelConfirm.payment_method === 'online' && cancelConfirm.payment_status === 'paid' && (
+                <Box sx={{ mt: 1.5, p: 1.2, bgcolor: '#fef3c7', borderRadius: 2, border: '1px solid #fbbf24' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#92400e', display: 'block' }}>
+                    💳 Bu sipariş PayTR ile ödenmiş
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#92400e' }}>
+                    İptal onaylandığında müşteriye {parseFloat(cancelConfirm.total_amount).toFixed(2)} TL otomatik olarak iade edilecektir.
+                  </Typography>
+                </Box>
+              )}
             </Box>
           )}
         </DialogContent>

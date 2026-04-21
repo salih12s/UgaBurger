@@ -3,6 +3,7 @@ const { Order, OrderItem, Product, Setting } = require('../models');
 const sequelize = require('../config/db');
 
 const PAYTR_API_URL = 'https://www.paytr.com/odeme/api/get-token';
+const PAYTR_REFUND_URL = 'https://www.paytr.com/odeme/iade';
 
 // PayTR iFrame token oluştur
 const getPaytrToken = async (req, res) => {
@@ -158,4 +159,84 @@ const paytrCallback = async (req, res) => {
   }
 };
 
-module.exports = { getPaytrToken, paytrCallback };
+// PayTR iade işlemi (düşük seviyeli yardımcı)
+// { merchant_oid, amount } -> PayTR API'sine iade isteği gönderir
+const refundPaytrPayment = async (merchantOid, amount) => {
+  const merchantId = process.env.PAYTR_MERCHANT_ID;
+  const merchantKey = process.env.PAYTR_MERCHANT_KEY;
+  const merchantSalt = process.env.PAYTR_MERCHANT_SALT;
+
+  if (!merchantId || !merchantKey || !merchantSalt) {
+    throw new Error('PayTR yapılandırması eksik');
+  }
+  if (!merchantOid) throw new Error('merchant_oid gerekli');
+  if (!amount || amount <= 0) throw new Error('İade tutarı geçersiz');
+
+  const returnAmount = parseFloat(amount).toFixed(2); // TL (PayTR iade endpointi TL bekler)
+  const hashStr = `${merchantId}${merchantOid}${returnAmount}${merchantSalt}`;
+  const paytrToken = crypto.createHmac('sha256', merchantKey).update(hashStr).digest('base64');
+
+  const params = new URLSearchParams({
+    merchant_id: merchantId,
+    merchant_oid: merchantOid,
+    return_amount: returnAmount,
+    paytr_token: paytrToken,
+  });
+
+  const response = await fetch(PAYTR_REFUND_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  const text = await response.text();
+  let result;
+  try { result = JSON.parse(text); } catch { result = { status: 'error', err_msg: text }; }
+
+  if (result.status !== 'success') {
+    throw new Error(result.err_msg || result.reason || 'PayTR iade başarısız');
+  }
+  return result;
+};
+
+// Admin: siparişi iade et (HTTP endpoint)
+const refundOrder = async (req, res) => {
+  try {
+    const { order_id, amount } = req.body;
+    if (!order_id) return res.status(400).json({ error: 'order_id gerekli' });
+
+    const order = await Order.findByPk(order_id);
+    if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı' });
+
+    if (order.payment_method !== 'online') {
+      return res.status(400).json({ error: 'Sadece online ödenen siparişler iade edilebilir' });
+    }
+    if (order.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'Bu sipariş ödenmemiş veya zaten iade edilmiş' });
+    }
+    if (!order.merchant_oid) {
+      return res.status(400).json({ error: 'PayTR işlem referansı bulunamadı' });
+    }
+
+    const refundAmount = amount ? parseFloat(amount) : parseFloat(order.total_amount);
+    if (refundAmount > parseFloat(order.total_amount)) {
+      return res.status(400).json({ error: 'İade tutarı sipariş tutarını aşamaz' });
+    }
+
+    await refundPaytrPayment(order.merchant_oid, refundAmount);
+
+    await order.update({
+      payment_status: 'refunded',
+      refund_amount: refundAmount,
+      refunded_at: new Date(),
+      status: 'cancelled',
+    });
+
+    res.json({ success: true, message: 'İade başarılı', refund_amount: refundAmount, order });
+  } catch (err) {
+    console.error('PayTR iade hatası:', err);
+    res.status(500).json({ error: err.message || 'İade işlemi başarısız' });
+  }
+};
+
+module.exports = { getPaytrToken, paytrCallback, refundOrder, refundPaytrPayment };

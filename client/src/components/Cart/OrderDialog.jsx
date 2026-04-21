@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api, { getImageUrl } from '../../api/api';
 import toast from 'react-hot-toast';
 import {
-  Dialog, DialogContent, Box, Typography, Button, IconButton, TextField, Stack,
+  Dialog, DialogContent, DialogTitle, DialogActions, Box, Typography, Button, IconButton, TextField, Stack,
   LinearProgress, Avatar, Divider, Checkbox, FormControlLabel, Radio, RadioGroup, FormControl
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -25,7 +25,7 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 // PayTR iFrame bileşeni
-function PaytrIframe({ token, onSuccess }) {
+function PaytrIframe({ token, onSuccess, onFail }) {
   const iframeRef = useRef(null);
 
   useEffect(() => {
@@ -44,6 +44,18 @@ function PaytrIframe({ token, onSuccess }) {
       window.iFrameResize({}, '#paytriframe');
     }
   }, [token]);
+
+  // iframe içindeki başarılı/başarısız sayfadan postMessage dinle
+  useEffect(() => {
+    const handler = (e) => {
+      const data = e.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'paytr_success') onSuccess?.(data);
+      if (data.type === 'paytr_fail') onFail?.(data);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onSuccess, onFail]);
 
   return (
     <Box sx={{ p: 0, flex: 1 }}>
@@ -79,6 +91,15 @@ export default function OrderDialog({ onClose, products }) {
   const [editingAddress, setEditingAddress] = useState(null);
   const [paytrToken, setPaytrToken] = useState(null);
   const [paytrOrderId, setPaytrOrderId] = useState(null);
+  const [kvkkDialog, setKvkkDialog] = useState(false);
+  const [preInfoDialog, setPreInfoDialog] = useState(false);
+  const [salesDialog, setSalesDialog] = useState(false);
+
+  const defaultKvkkText = `Veri Sorumlusu:\nAhmet Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin\nE-posta: bilgi@ugaburger.com\n\nKişisel verileriniz; sipariş süreçlerinin yürütülmesi, iletişim faaliyetlerinin sağlanması ve hukuki yükümlülüklerin yerine getirilmesi amacıyla 6698 sayılı KVKK kapsamında işlenmektedir.\n\nToplanan kişisel veriler: Ad, Soyad, Telefon, E-posta, Adres bilgileri.\n\nVerileriniz yasal zorunluluklar dışında üçüncü kişilerle paylaşılmamaktadır. KVKK'nın 11. maddesi gereğince bilgi edinme, düzeltme ve silme haklarınız saklıdır.`;
+
+  const defaultPreInfoText = `ÖN BİLGİLENDİRME FORMU\n\nSatıcı: Ahmet Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: İnönü Mah. No:2 Yenişehir / Mersin\n\nSipariş konusu ürün/hizmet: Seçilen yemek ürünleri\nToplam fiyat: Sipariş ekranında belirtilmiştir (KDV dahil)\nÖdeme şekli: Online ödeme / kapıda ödeme (varsa)\nTeslimat süresi: Ortalama 30-60 dakika\n\nCayma hakkı: Gıda ürünlerinde cayma hakkı bulunmamaktadır.\n\nFatura Bilgisi:\nVerilen tüm siparişler için 213 sayılı Vergi Usul Kanunu uyarınca e-arşiv fatura düzenlenmekte olup, müşterinin sipariş sırasında belirttiği e-posta adresine gönderilmektedir.\n\nAlıcı, siparişi onaylayarak yukarıdaki bilgileri okuduğunu, anladığını ve kabul ettiğini beyan eder.`;
+
+  const defaultSalesText = `SATICI BİLGİLERİ\nSatıcı: Ahmet Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin\n\nSipariş onaylandıktan sonra hazırlanmaya başlanır. Hazırlığa başlanmış siparişler iptal edilemez.\n\nTeslimat süresi bölgeye ve yoğunluğa göre değişiklik gösterebilir.\n\nÖdeme, sipariş onayı sonrasında tahsil edilir. İade ve cayma hakkı, tüketici mevzuatı çerçevesinde uygulanır.`;
 
   useEffect(() => { api.get('/settings').then(res => setSettings(res.data)); }, []);
 
@@ -216,7 +237,11 @@ export default function OrderDialog({ onClose, products }) {
           </Stack>
           <IconButton size="small" onClick={() => { setPaytrToken(null); }}><CloseIcon /></IconButton>
         </Box>
-        <PaytrIframe token={paytrToken} onSuccess={() => { clearCart(); setPaytrToken(null); setSuccessOrder({ id: paytrOrderId }); }} />
+        <PaytrIframe
+          token={paytrToken}
+          onSuccess={() => { clearCart(); setPaytrToken(null); setSuccessOrder({ id: paytrOrderId }); }}
+          onFail={() => { setPaytrToken(null); toast.error('Ödeme başarısız oldu. Lütfen tekrar deneyin.'); }}
+        />
       </Dialog>
     );
   }
@@ -431,8 +456,26 @@ export default function OrderDialog({ onClose, products }) {
             </Stack>
             <FormControlLabel
               control={<Checkbox checked={kvkkAccepted} onChange={e => setKvkkAccepted(e.target.checked)} size="small" sx={{ '&.Mui-checked': { color: '#dc2626' } }} />}
-              label={<Typography variant="caption">KVKK Aydınlatma Metni ve Mesafeli Satış Sözleşmesi'ni kabul ediyorum.</Typography>}
-              sx={{ mt: 1, mb: 1 }}
+              label={
+                <Typography variant="caption" sx={{ lineHeight: 1.5 }}>
+                  <Typography component="span" variant="caption" onClick={e => { e.preventDefault(); e.stopPropagation(); setKvkkDialog(true); }}
+                    sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>
+                    KVKK Aydınlatma Metni
+                  </Typography>
+                  {', '}
+                  <Typography component="span" variant="caption" onClick={e => { e.preventDefault(); e.stopPropagation(); setPreInfoDialog(true); }}
+                    sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>
+                    Ön Bilgilendirme Formu
+                  </Typography>
+                  {' ve '}
+                  <Typography component="span" variant="caption" onClick={e => { e.preventDefault(); e.stopPropagation(); setSalesDialog(true); }}
+                    sx={{ color: '#3b82f6', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>
+                    Mesafeli Satış Sözleşmesi
+                  </Typography>
+                  {"'ni kabul ediyorum."}
+                </Typography>
+              }
+              sx={{ mt: 1, mb: 1, alignItems: 'flex-start' }}
             />
             <Button fullWidth variant="contained" onClick={handleConfirm} disabled={loading || !canOrder || !kvkkAccepted}
               endIcon={!loading && <LockIcon />}
@@ -442,6 +485,51 @@ export default function OrderDialog({ onClose, products }) {
           </Box>
         </Box>
       </DialogContent>
+
+      {/* KVKK Aydınlatma Metni */}
+      <Dialog open={kvkkDialog} onClose={() => setKvkkDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>KVKK Aydınlatma Metni</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}>
+            {settings.kvkk_text || defaultKvkkText}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setKvkkAccepted(true); setKvkkDialog(false); }} variant="contained" sx={{ fontWeight: 600 }}>
+            Okudum, Kabul Ediyorum
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Ön Bilgilendirme Formu */}
+      <Dialog open={preInfoDialog} onClose={() => setPreInfoDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Ön Bilgilendirme Formu</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}>
+            {settings.pre_info_text || defaultPreInfoText}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setKvkkAccepted(true); setPreInfoDialog(false); }} variant="contained" sx={{ fontWeight: 600 }}>
+            Okudum, Kabul Ediyorum
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Mesafeli Satış Sözleşmesi */}
+      <Dialog open={salesDialog} onClose={() => setSalesDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Mesafeli Satış Sözleşmesi</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}>
+            {settings.sales_agreement || defaultSalesText}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setKvkkAccepted(true); setSalesDialog(false); }} variant="contained" sx={{ fontWeight: 600 }}>
+            Okudum, Kabul Ediyorum
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

@@ -129,13 +129,22 @@ export default function TableOrders() {
 <style>
   @page { size: 80mm auto; margin: 2mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: ${rFontPx}px; width: 76mm; }
+  body {
+    font-family: 'Arial Black', 'Helvetica', Arial, sans-serif;
+    font-size: ${rFontPx + 1}px;
+    width: 76mm;
+    font-weight: 900;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    letter-spacing: 0.3px;
+  }
   .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .sep { border-top: 1px dashed #000; margin: 4px 0; }
+  .bold { font-weight: 900; }
+  .sep { border-top: 2px solid #000; margin: 5px 0; }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 1px 0; vertical-align: top; }
-  .total { font-size: ${rFontPx + 4}px; font-weight: bold; }
+  td { padding: 2px 0; vertical-align: top; font-weight: 900; }
+  .total { font-size: ${rFontPx + 6}px; font-weight: 900; }
 </style></head><body>
   <div class="center bold" style="font-size:${rFontPx + 6}px;margin-bottom:2px">${rTitle}</div>
   <div class="sep"></div>

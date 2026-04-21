@@ -3,7 +3,7 @@ import { getImageUrl } from '../../api/api';
 
 export default function ProductCard({ product, onClick, disabled }) {
   return (
-    <Card onClick={disabled ? undefined : onClick} sx={{ cursor: disabled ? 'default' : 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', ...(disabled ? { filter: 'grayscale(100%)', opacity: 0.6 } : { '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' } }) }}>
+    <Card onClick={disabled ? undefined : onClick} sx={{ cursor: disabled ? 'default' : 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', ...(disabled ? {} : { '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' } }) }}>
       {product.image_url ? (
         <CardMedia component="img" height="200" image={getImageUrl(product.image_url)} alt={product.name} sx={{ objectFit: 'cover' }} />
       ) : (
@@ -12,11 +12,11 @@ export default function ProductCard({ product, onClick, disabled }) {
       <CardContent>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{product.name}</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 18 }}>{product.description}</Typography>
-        <Typography sx={{ fontWeight: 700, color: disabled ? '#999' : '#dc2626', fontSize: 16, mb: 1.5 }}>{parseFloat(product.price).toFixed(2)} TL</Typography>
+        <Typography sx={{ fontWeight: 700, color: '#dc2626', fontSize: 16, mb: 1.5 }}>{parseFloat(product.price).toFixed(2)} TL</Typography>
         <Button fullWidth variant="contained" disabled={disabled}
           onClick={(e) => { e.stopPropagation(); onClick(); }}
           sx={{ fontWeight: 700 }}>
-          {disabled ? 'Mesai Dışı' : 'Sepete Ekle'}
+          {disabled ? 'Sipariş Kapalı' : 'Sepete Ekle'}
         </Button>
       </CardContent>
     </Card>

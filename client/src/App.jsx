@@ -4,6 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { useEffect } from 'react';
 import theme from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -20,6 +21,14 @@ import AdminLayout from './components/Admin/AdminLayout';
 
 // PayTR ödeme sonuç sayfaları (iframe içinde gösterilir)
 function PaymentSuccess() {
+  const [params] = useSearchParams();
+  useEffect(() => {
+    try {
+      const orderId = params.get('order');
+      // Ana pencereye (OrderDialog) haber ver
+      window.parent?.postMessage({ type: 'paytr_success', orderId }, '*');
+    } catch {}
+  }, [params]);
   return (
     <Box sx={{ textAlign: 'center', py: 8, px: 3 }}>
       <Typography sx={{ fontSize: 56, mb: 2 }}>✅</Typography>
@@ -30,6 +39,9 @@ function PaymentSuccess() {
 }
 
 function PaymentFail() {
+  useEffect(() => {
+    try { window.parent?.postMessage({ type: 'paytr_fail' }, '*'); } catch {}
+  }, []);
   return (
     <Box sx={{ textAlign: 'center', py: 8, px: 3 }}>
       <Typography sx={{ fontSize: 56, mb: 2 }}>❌</Typography>

@@ -12,11 +12,13 @@ const Order = sequelize.define('Order', {
     defaultValue: 'pending',
   },
   payment_status: {
-    type: DataTypes.ENUM('pending', 'paid', 'failed'),
+    type: DataTypes.ENUM('pending', 'paid', 'failed', 'refunded'),
     defaultValue: 'pending',
   },
+  refund_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: true, defaultValue: null },
+  refunded_at: { type: DataTypes.DATE, allowNull: true, defaultValue: null },
   payment_method: {
-    type: DataTypes.ENUM('door', 'online'),
+    type: DataTypes.ENUM('door', 'online', 'card'),
     defaultValue: 'door',
   },
   total_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },

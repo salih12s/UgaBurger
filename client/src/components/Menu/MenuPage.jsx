@@ -7,7 +7,7 @@ import OrderDialog from '../Cart/OrderDialog';
 import AddressFormDialog from '../Cart/AddressFormDialog';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
-import { Box, Button, Chip, Stack, Typography, Fab, Badge, Alert } from '@mui/material';
+import { Box, Button, Chip, Stack, Typography, Fab, Badge } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 
 export default function MenuPage() {
@@ -76,12 +76,42 @@ export default function MenuPage() {
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2.5 }}>
       {settingsLoaded && !isOnlineActive && (
-        <Alert severity="info" variant="filled"
-          icon={<Typography sx={{ fontSize: 20 }}>{settings.closed_banner_icon || '🔴'}</Typography>}
-          action={<Button color="inherit" size="small" variant="outlined" onClick={() => navigate('/contact')} sx={{ borderRadius: 20, whiteSpace: 'nowrap' }}>İletişim & Detay ›</Button>}
-          sx={{ mb: 3, borderRadius: 3, bgcolor: settings.closed_banner_color || '#3b82f6', '& .MuiAlert-icon': { color: '#fff' } }}>
-          {settings.closed_message || 'Şuanda online sipariş hizmeti verilmemektedir.'}
-        </Alert>
+        <Box sx={{
+          mb: 3,
+          p: 2,
+          borderRadius: 3,
+          bgcolor: settings.closed_banner_color || '#3b82f6',
+          color: '#fff',
+        }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.5}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            justifyContent="space-between"
+          >
+            <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: 20, lineHeight: 1.4 }}>{settings.closed_banner_icon || '🔴'}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: '#fff', wordBreak: 'break-word', flex: 1 }}>
+                {settings.closed_message || 'Şuanda online sipariş hizmeti verilmemektedir.'}
+              </Typography>
+            </Stack>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => navigate('/contact')}
+              sx={{
+                borderRadius: 20,
+                whiteSpace: 'nowrap',
+                color: '#fff',
+                borderColor: 'rgba(255,255,255,0.7)',
+                alignSelf: { xs: 'flex-start', sm: 'center' },
+                '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              İletişim & Detay ›
+            </Button>
+          </Stack>
+        </Box>
       )}
 
       <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 3, '&::-webkit-scrollbar': { display: 'none' } }}>
