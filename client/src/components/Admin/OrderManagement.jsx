@@ -96,11 +96,21 @@ export default function OrderManagement() {
 
   const playNotificationSound = useCallback(() => {
     try {
-      if (notificationAudio.current) {
-        notificationAudio.current.currentTime = 0;
-        const p = notificationAudio.current.play();
-        if (p && p.catch) p.catch(() => {});
-      }
+      if (!notificationAudio.current) return;
+      // Tek çalma yerine 3 kez bip sesi (bildirim hissi için)
+      let count = 0;
+      const playOnce = () => {
+        if (count >= 3) return;
+        try {
+          const a = notificationAudio.current.cloneNode(true);
+          a.volume = 1.0;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => {});
+        } catch { /* noop */ }
+        count += 1;
+        setTimeout(playOnce, 450);
+      };
+      playOnce();
     } catch { /* noop */ }
   }, []);
 

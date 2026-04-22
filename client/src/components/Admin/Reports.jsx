@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import api from '../../api/api';
 import {
   Box, Typography, Card, TextField, Stack, Chip, Collapse, IconButton,
-  Table, TableHead, TableBody, TableRow, TableCell, CircularProgress, Button, Divider
+  Table, TableHead, TableBody, TableRow, TableCell, CircularProgress, Button, Divider,
+  FormControlLabel, Checkbox
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -16,6 +17,8 @@ export default function Reports() {
   const [onlineExpanded, setOnlineExpanded] = useState(false);
   const [tableExpanded, setTableExpanded] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const [showCash, setShowCash] = useState(true);
+  const [showCard, setShowCard] = useState(true);
 
   const fetchReport = () => {
     setLoading(true);
@@ -42,11 +45,20 @@ export default function Reports() {
   const onlineOrders = report.orderDetails?.filter(o => o.order_type === 'online') || [];
   const tableOrders = report.orderDetails?.filter(o => o.order_type === 'table') || [];
 
+  // Ödeme yöntemi filtresi (Kart = online/card, Nakit = cash/door)
+  // Default: ikisi de seçili. İkisi de kapalıysa veri gösterilmesin.
+  const paymentMatches = (o) => {
+    const isCard = o.payment_method === 'online' || o.payment_method === 'card';
+    if (isCard) return showCard;
+    return showCash;
+  };
+
   // Filtre: masa numarası, ismi veya müşteri adı
   const filterOrders = (orders) => {
-    if (!searchFilter.trim()) return orders;
+    let filtered = orders.filter(paymentMatches);
+    if (!searchFilter.trim()) return filtered;
     const q = searchFilter.toLowerCase();
-    return orders.filter(o => {
+    return filtered.filter(o => {
       const tableNum = o.table?.table_number?.toString() || '';
       const tableName = (o.table?.table_name || '').toLowerCase();
       const customerName = o.customer_name ? o.customer_name.toLowerCase() : '';
@@ -57,7 +69,7 @@ export default function Reports() {
 
   const filteredOnlineOrders = filterOrders(onlineOrders);
   const filteredTableOrders = filterOrders(tableOrders);
-  const isFiltered = searchFilter.trim() !== '';
+  const isFiltered = searchFilter.trim() !== '' || !showCash || !showCard;
 
   const displayTotalOrders = isFiltered ? filteredOnlineOrders.length + filteredTableOrders.length : report.totalOrders;
   const displayTotalRevenue = isFiltered ? [...filteredOnlineOrders, ...filteredTableOrders].reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.totalRevenue);
@@ -127,6 +139,15 @@ export default function Reports() {
           <TextField type="date" size="small" label="Başlangıç" value={startDate} onChange={e => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} />
           <TextField type="date" size="small" label="Bitiş" value={endDate} onChange={e => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} />
           <Button variant="contained" size="small" onClick={fetchReport} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Filtrele</Button>
+          <FormControlLabel
+            control={<Checkbox size="small" checked={showCash} onChange={e => setShowCash(e.target.checked)} sx={{ '&.Mui-checked': { color: '#16a34a' } }} />}
+            label={<Typography variant="body2" sx={{ fontWeight: 700, color: showCash ? '#16a34a' : '#999' }}>💵 Nakit</Typography>}
+            sx={{ ml: 0.5 }}
+          />
+          <FormControlLabel
+            control={<Checkbox size="small" checked={showCard} onChange={e => setShowCard(e.target.checked)} sx={{ '&.Mui-checked': { color: '#3b82f6' } }} />}
+            label={<Typography variant="body2" sx={{ fontWeight: 700, color: showCard ? '#3b82f6' : '#999' }}>💳 Kart</Typography>}
+          />
         </Stack>
       </Stack>
 

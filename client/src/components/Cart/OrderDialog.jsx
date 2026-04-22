@@ -103,6 +103,15 @@ export default function OrderDialog({ onClose, products }) {
 
   useEffect(() => { api.get('/settings').then(res => setSettings(res.data)); }, []);
 
+  // Online ödeme başarılı olduğunda 4 saniye sonra otomatik kapat ve menüye yönlendir
+  useEffect(() => {
+    if (!successOrder) return;
+    const t = setTimeout(() => {
+      try { onClose?.(); navigate('/menu'); } catch {}
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [successOrder, onClose, navigate]);
+
   useEffect(() => {
     if (user?.addresses && Array.isArray(user.addresses)) {
       setUserAddresses(user.addresses);

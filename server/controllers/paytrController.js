@@ -4,6 +4,8 @@ const sequelize = require('../config/db');
 
 const PAYTR_API_URL = 'https://www.paytr.com/odeme/api/get-token';
 const PAYTR_REFUND_URL = 'https://www.paytr.com/odeme/iade';
+// Provizyon kapatma (capture) - pre-auth modunda alınmış ödemeleri finalize eder
+const PAYTR_CAPTURE_URL = 'https://www.paytr.com/odeme/kapat';
 
 // PayTR iFrame token oluştur
 const getPaytrToken = async (req, res) => {
@@ -199,6 +201,70 @@ const refundPaytrPayment = async (merchantOid, amount) => {
   return result;
 };
 
+// PayTR provizyon kapatma (capture) - pre-auth alınan ödemeyi tahsil eder
+// Not: Sadece PayTR hesabınız "Ön Provizyon (pre-auth)" modunda ise gereklidir.
+// Immediate capture modunda bu çağrı zararsızdır ve uyarı/fakat hata dönebilir.
+const capturePaytrPayment = async (merchantOid) => {
+  const merchantId = process.env.PAYTR_MERCHANT_ID;
+  const merchantKey = process.env.PAYTR_MERCHANT_KEY;
+  const merchantSalt = process.env.PAYTR_MERCHANT_SALT;
+
+  if (!merchantId || !merchantKey || !merchantSalt) {
+    throw new Error('PayTR yapılandırması eksik');
+  }
+  if (!merchantOid) throw new Error('merchant_oid gerekli');
+
+  const hashStr = `${merchantId}${merchantOid}${merchantSalt}`;
+  const paytrToken = crypto.createHmac('sha256', merchantKey).update(hashStr).digest('base64');
+
+  const params = new URLSearchParams({
+    merchant_id: merchantId,
+    merchant_oid: merchantOid,
+    paytr_token: paytrToken,
+  });
+
+  const response = await fetch(PAYTR_CAPTURE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  const text = await response.text();
+  let result;
+  try { result = JSON.parse(text); } catch { result = { status: 'error', err_msg: text }; }
+
+  if (result.status !== 'success') {
+    throw new Error(result.err_msg || result.reason || 'PayTR provizyon kapatma başarısız');
+  }
+  return result;
+};
+
+// Admin: siparişin PayTR provizyonunu kapat (HTTP endpoint)
+const captureOrder = async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    if (!order_id) return res.status(400).json({ error: 'order_id gerekli' });
+
+    const order = await Order.findByPk(order_id);
+    if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı' });
+    if (order.payment_method !== 'online') {
+      return res.status(400).json({ error: 'Sadece online ödenen siparişler provizyondan kapatılabilir' });
+    }
+    if (!order.merchant_oid) {
+      return res.status(400).json({ error: 'PayTR işlem referansı bulunamadı' });
+    }
+    if (order.payment_status === 'refunded') {
+      return res.status(400).json({ error: 'Bu sipariş iade edilmiş' });
+    }
+
+    const result = await capturePaytrPayment(order.merchant_oid);
+    res.json({ success: true, message: 'Provizyon kapatıldı (tahsil edildi)', result });
+  } catch (err) {
+    console.error('PayTR capture hatası:', err);
+    res.status(500).json({ error: err.message || 'Provizyon kapatma başarısız' });
+  }
+};
+
 // Admin: siparişi iade et (HTTP endpoint)
 const refundOrder = async (req, res) => {
   try {
@@ -239,4 +305,4 @@ const refundOrder = async (req, res) => {
   }
 };
 
-module.exports = { getPaytrToken, paytrCallback, refundOrder, refundPaytrPayment };
+module.exports = { getPaytrToken, paytrCallback, refundOrder, refundPaytrPayment, capturePaytrPayment, captureOrder };

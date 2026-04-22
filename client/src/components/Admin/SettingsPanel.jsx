@@ -144,6 +144,7 @@ export default function SettingsPanel() {
       ['online_order_active', s('online_order_active','true')],
       ['kvkk_text', s('kvkk_text')],
       ['privacy_text', s('privacy_text')],
+      ['pre_info_text', s('pre_info_text')],
       ['sales_agreement', s('sales_agreement')],
       ['delivery_zones', JSON.stringify(zones)],
     ];
@@ -154,6 +155,9 @@ export default function SettingsPanel() {
     });
     try {
       for (const [k, v] of pairs) await api.put('/admin/settings', { key: k, value: String(v) });
+      // Kaydetme sonrası ayarları yeniden yükle (senkron tutmak için)
+      const fresh = await api.get('/admin/settings');
+      setSettings(fresh.data);
       toast.success('Tüm ayarlar kaydedildi!');
     } catch { toast.error('Kaydetme hatası'); }
     setLoading(false);
@@ -632,6 +636,10 @@ export default function SettingsPanel() {
         <TextField fullWidth multiline rows={6} size="small" value={s('kvkk_text', 'Veri Sorumlusu:\nAhment Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin\nE-posta: bilgi@ugaburger.com')} onChange={e => upd('kvkk_text', e.target.value)} sx={{ mb: 2 }} />
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>✅ GİZLİLİK POLİTİKASI</Typography>
         <TextField fullWidth multiline rows={4} size="small" value={s('privacy_text', 'Uga Burger, kullanıcı bilgilerinin gizliliğini korur.')} onChange={e => upd('privacy_text', e.target.value)} sx={{ mb: 2 }} />
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>✅ ÖN BİLGİLENDİRME FORMU</Typography>
+        <TextField fullWidth multiline rows={6} size="small"
+          value={s('pre_info_text', 'ÖN BİLGİLENDİRME FORMU\n\nSatıcı: Ahmet Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: İnönü Mah. No:2 Yenişehir / Mersin\n\nSipariş konusu ürün/hizmet: Seçilen yemek ürünleri\nToplam fiyat: Sipariş ekranında belirtilmiştir (KDV dahil)\n\u00d6deme şekli: Online ödeme / kapıda ödeme (varsa)\nTeslimat süresi: Ortalama 30-60 dakika\n\nCayma hakkı: Gıda ürünlerinde cayma hakkı bulunmamaktadır.')}
+          onChange={e => upd('pre_info_text', e.target.value)} sx={{ mb: 2 }} />
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>✅ MESAFELİ SATIŞ SÖZLEŞMESİ</Typography>
         <TextField fullWidth multiline rows={4} size="small" value={s('sales_agreement', 'Satıcı: Ahment Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin')} onChange={e => upd('sales_agreement', e.target.value)} sx={{ mb: 2 }} />
       </Section>

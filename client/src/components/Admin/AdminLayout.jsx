@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/api';
 import OrderManagement from './OrderManagement';
 import TableOrders from './TableOrders';
 import MenuManagement from './MenuManagement';
@@ -9,7 +10,7 @@ import SettingsPanel from './SettingsPanel';
 import UserManagement from './UserManagement';
 import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Typography,
-  IconButton, useMediaQuery, useTheme
+  IconButton, useMediaQuery, useTheme, Badge
 } from '@mui/material';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -35,12 +36,44 @@ const DRAWER_WIDTH = 260;
 export default function AdminLayout() {
   const [activeTab, setActiveTab] = useState('orders');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [seenCount, setSeenCount] = useState(0);
   const { logout } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const handleLogout = () => { logout(); navigate('/'); };
+
+  // Pending sipariş sayısını periyodik olarak takip et (bildirim rozeti için)
+  const pendingRef = useRef(0);
+  const seenRef = useRef(0);
+  useEffect(() => {
+    const fetchPending = async () => {
+      try {
+        const res = await api.get('/admin/orders');
+        const count = res.data.filter(o => o.status === 'pending').length;
+        pendingRef.current = count;
+        // Eğer kullanıcı şu an Siparişler sekmesinde ise otomatik olarak görülmüş say
+        if (activeTab === 'orders') seenRef.current = count;
+        setPendingCount(count);
+      } catch { /* sessiz geç */ }
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 10000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
+  // Siparişler sekmesine girildiğinde "görüldü" olarak işaretle
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      seenRef.current = pendingRef.current;
+      setSeenCount(pendingRef.current);
+    }
+  }, [activeTab]);
+
+  // Badge = henüz görülmemiş yeni bekleyen sipariş sayısı
+  const unseenPending = activeTab === 'orders' ? 0 : Math.max(0, pendingCount - seenCount);
 
   const sidebarContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#1e1e2d', color: '#fff' }}>
@@ -57,6 +90,10 @@ export default function AdminLayout() {
               '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' } }}>
             <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>{tab.icon}</ListItemIcon>
             <ListItemText primary={tab.label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }} />
+            {tab.id === 'orders' && unseenPending > 0 && (
+              <Badge badgeContent={unseenPending} color="error"
+                sx={{ mr: 1.5, '& .MuiBadge-badge': { bgcolor: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 11, minWidth: 20, height: 20 } }} />
+            )}
           </ListItemButton>
         ))}
       </List>

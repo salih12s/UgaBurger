@@ -39,7 +39,8 @@ export default function HomePage() {
   const [settings, setSettings] = useState({});
 
   useEffect(() => {
-    api.get('/settings').then(r => setSettings(r.data)).catch(() => {});
+    // Cache-bust ile ayarları her zaman taze getir (admin değişikliklerinin anında yansıması için)
+    api.get(`/settings?t=${Date.now()}`).then(r => setSettings(r.data)).catch(() => {});
   }, []);
 
   const heroTitle = settings.hero_title || 'Taş Devrinden Gelen Lezzet';

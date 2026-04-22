@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
 const { Order, OrderItem, Product, User, Table, Category, Extra, ProductExtra, Setting, PromoCode } = require('../models');
-const { refundPaytrPayment } = require('./paytrController');
+const { refundPaytrPayment, capturePaytrPayment } = require('./paytrController');
 const multer = require('multer');
 const path = require('path');
 
@@ -41,6 +41,23 @@ const updateOrderStatus = async (req, res) => {
       order.payment_status = 'paid';
     }
 
+    // Admin sipariş onayında (pending -> preparing/confirmed) online ödeme provizyonunu kapat
+    // (PayTR hesabı pre-auth modundaysa gereklidir; immediate capture modunda sessizce geçer)
+    let captureInfo = null;
+    if ((status === 'preparing' || status === 'confirmed')
+        && order.payment_method === 'online'
+        && order.payment_status === 'paid'
+        && order.merchant_oid) {
+      try {
+        await capturePaytrPayment(order.merchant_oid);
+        captureInfo = { captured: true };
+      } catch (captureErr) {
+        // Provizyon kapatma başarısız olsa bile sipariş onayını engelleme (log et, devam et)
+        console.warn(`PayTR capture uyarısı (sipariş #${order.id}):`, captureErr.message);
+        captureInfo = { captured: false, reason: captureErr.message };
+      }
+    }
+
     // İptal ediliyorsa ve online ödeme alınmışsa otomatik PayTR iadesi
     let refundInfo = null;
     if (status === 'cancelled') {
@@ -65,7 +82,7 @@ const updateOrderStatus = async (req, res) => {
     }
 
     await order.save();
-    res.json({ ...order.toJSON(), refund: refundInfo });
+    res.json({ ...order.toJSON(), refund: refundInfo, capture: captureInfo });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
   }

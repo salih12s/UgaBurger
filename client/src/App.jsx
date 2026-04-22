@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -22,31 +22,44 @@ import AdminLayout from './components/Admin/AdminLayout';
 // PayTR ödeme sonuç sayfaları (iframe içinde gösterilir)
 function PaymentSuccess() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   useEffect(() => {
-    try {
-      const orderId = params.get('order');
-      // Ana pencereye (OrderDialog) haber ver
-      window.parent?.postMessage({ type: 'paytr_success', orderId }, '*');
-    } catch {}
-  }, [params]);
+    const orderId = params.get('order');
+    // Ana pencereye (OrderDialog) haber ver (iframe içindeyken)
+    try { window.parent?.postMessage({ type: 'paytr_success', orderId }, '*'); } catch {}
+    // Iframe dışında tam sayfa olarak açıldıysa, birkaç saniye sonra siteye yönlendir
+    const isStandalone = window.parent === window;
+    const timer = setTimeout(() => {
+      if (isStandalone) {
+        navigate('/profile', { replace: true });
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [params, navigate]);
   return (
     <Box sx={{ textAlign: 'center', py: 8, px: 3 }}>
       <Typography sx={{ fontSize: 56, mb: 2 }}>✅</Typography>
       <Typography variant="h5" sx={{ fontWeight: 800, color: '#16a34a', mb: 1 }}>Ödeme Başarılı!</Typography>
-      <Typography variant="body2" color="text.secondary">Siparişiniz onaylandı. Bu pencere kısa süre içinde kapanacaktır.</Typography>
+      <Typography variant="body2" color="text.secondary">Siparişiniz onaylandı. Yönlendiriliyorsunuz...</Typography>
     </Box>
   );
 }
 
 function PaymentFail() {
+  const navigate = useNavigate();
   useEffect(() => {
     try { window.parent?.postMessage({ type: 'paytr_fail' }, '*'); } catch {}
-  }, []);
+    const isStandalone = window.parent === window;
+    const timer = setTimeout(() => {
+      if (isStandalone) navigate('/menu', { replace: true });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [navigate]);
   return (
     <Box sx={{ textAlign: 'center', py: 8, px: 3 }}>
       <Typography sx={{ fontSize: 56, mb: 2 }}>❌</Typography>
       <Typography variant="h5" sx={{ fontWeight: 800, color: '#dc2626', mb: 1 }}>Ödeme Başarısız</Typography>
-      <Typography variant="body2" color="text.secondary">Ödemeniz işlenemedi. Lütfen tekrar deneyin.</Typography>
+      <Typography variant="body2" color="text.secondary">Ödemeniz işlenemedi. Menüye yönlendiriliyorsunuz...</Typography>
     </Box>
   );
 }
