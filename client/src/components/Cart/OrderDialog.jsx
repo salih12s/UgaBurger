@@ -14,6 +14,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import LockIcon from '@mui/icons-material/Lock';
 import AddressFormDialog from './AddressFormDialog';
+import BillingAddressDialog from './BillingAddressDialog';
 
 // Haversine mesafe hesaplama (km)
 const haversineDistance = (lat1, lon1, lat2, lon2) => {
@@ -94,6 +95,11 @@ export default function OrderDialog({ onClose, products }) {
   const [kvkkDialog, setKvkkDialog] = useState(false);
   const [preInfoDialog, setPreInfoDialog] = useState(false);
   const [salesDialog, setSalesDialog] = useState(false);
+
+  // Fatura adresi state
+  const [billingSame, setBillingSame] = useState(true);
+  const [billingAddress, setBillingAddress] = useState(null);
+  const [showBillingForm, setShowBillingForm] = useState(false);
 
   const defaultKvkkText = `Veri Sorumlusu:\nAhmet Muhittin Ark ve Ulaş Kantarcı Adi Ortaklığı\nAdres: Uga Burger, İnönü Mah. No:2, Yenişehir / Mersin\nE-posta: bilgi@ugaburger.com\n\nKişisel verileriniz; sipariş süreçlerinin yürütülmesi, iletişim faaliyetlerinin sağlanması ve hukuki yükümlülüklerin yerine getirilmesi amacıyla 6698 sayılı KVKK kapsamında işlenmektedir.\n\nToplanan kişisel veriler: Ad, Soyad, Telefon, E-posta, Adres bilgileri.\n\nVerileriniz yasal zorunluluklar dışında üçüncü kişilerle paylaşılmamaktadır. KVKK'nın 11. maddesi gereğince bilgi edinme, düzeltme ve silme haklarınız saklıdır.`;
 
@@ -209,6 +215,7 @@ export default function OrderDialog({ onClose, products }) {
     const addr = selectedAddressIdx === -1 ? newAddress : deliveryAddress;
     if (!addr.trim()) { toast.error('Teslimat adresini giriniz'); return; }
     if (!kvkkAccepted) { toast.error('Sözleşmeleri kabul etmelisiniz'); return; }
+    if (!billingSame && !billingAddress) { toast.error('Fatura adresi giriniz veya "Faturamı Aynı Adrese Gönder" seçeneğini işaretleyin'); return; }
     setLoading(true);
     try {
       const orderItems = items.map(item => ({
@@ -216,6 +223,41 @@ export default function OrderDialog({ onClose, products }) {
         extras: item.selectedExtras.map(e => ({ id: e.id, name: e.name, price: e.price, quantity: e.quantity || 1 })),
       }));
       const selectedAddr = selectedAddressIdx >= 0 ? userAddresses[selectedAddressIdx] : null;
+
+      // Fatura payload
+      const invoicePayload = billingSame
+        ? {
+            invoice_type: 'bireysel',
+            billing_same_as_delivery: true,
+            billing_first_name: user?.first_name || null,
+            billing_last_name: user?.last_name || null,
+            billing_email: user?.email || null,
+            billing_phone: selectedAddr?.phone || user?.phone || null,
+            billing_address: selectedAddr ? {
+              address: addr,
+              city: selectedAddr.city, district: selectedAddr.district, neighborhood: selectedAddr.neighborhood,
+              street: selectedAddr.street, buildingNo: selectedAddr.buildingNo, floor: selectedAddr.floor, doorNo: selectedAddr.doorNo,
+            } : { address: addr },
+          }
+        : {
+            invoice_type: billingAddress.invoiceType,
+            billing_same_as_delivery: false,
+            billing_first_name: billingAddress.firstName || null,
+            billing_last_name: billingAddress.lastName || null,
+            billing_tckn: billingAddress.invoiceType === 'bireysel' ? billingAddress.tckn : null,
+            billing_company_title: billingAddress.invoiceType === 'kurumsal' ? billingAddress.companyTitle : null,
+            billing_tax_number: billingAddress.invoiceType === 'kurumsal' ? billingAddress.taxNumber : null,
+            billing_tax_office: billingAddress.invoiceType === 'kurumsal' ? billingAddress.taxOffice : null,
+            billing_is_einvoice_payer: !!billingAddress.isEinvoicePayer,
+            billing_email: billingAddress.email || user?.email || null,
+            billing_phone: billingAddress.phone || null,
+            billing_address: {
+              address: billingAddress.address,
+              city: billingAddress.city, district: billingAddress.district, neighborhood: billingAddress.neighborhood,
+              street: billingAddress.street, buildingNo: billingAddress.buildingNo, floor: billingAddress.floor, doorNo: billingAddress.doorNo,
+            },
+          };
+
       // 1) Sipariş oluştur
       const orderRes = await api.post('/orders', {
         items: orderItems, order_type: 'online',
@@ -224,11 +266,19 @@ export default function OrderDialog({ onClose, products }) {
         address_lng: selectedAddr?.lng || null,
         order_note: orderNote, payment_method: 'online',
         promo_code: promoResult ? promoResult.code : null,
+        ...invoicePayload,
       });
       const orderId = orderRes.data.id || orderRes.data.order?.id;
       setPaytrOrderId(orderId);
       // 2) PayTR token al
       const tokenRes = await api.post('/paytr/token', { order_id: orderId });
+      // DEV BYPASS: backend PAYTR_BYPASS=true ise PayTR'a gitmeden ödeme "başarılı" dönebilir
+      if (tokenRes.data.bypass) {
+        clearCart();
+        setSuccessOrder({ id: orderId });
+        toast.success('Siparişiniz alındı (TEST MODU - ödeme atlatıldı)');
+        return;
+      }
       setPaytrToken(tokenRes.data.token);
     } catch (err) { toast.error(err.response?.data?.error || 'Sipariş hatası'); }
     finally { setLoading(false); }
@@ -263,6 +313,18 @@ export default function OrderDialog({ onClose, products }) {
         onClose={() => setShowAddressForm(false)}
         onSave={handleAddressSaved}
         editAddress={editingAddress !== null ? userAddresses[editingAddress] : null}
+      />
+    );
+  }
+
+  // Fatura adresi formu diyaloğu
+  if (showBillingForm) {
+    return (
+      <BillingAddressDialog
+        open={true}
+        onClose={() => setShowBillingForm(false)}
+        onSave={(data) => { setBillingAddress(data); setShowBillingForm(false); toast.success('Fatura adresi kaydedildi'); }}
+        editAddress={billingAddress}
       />
     );
   }
@@ -353,10 +415,59 @@ export default function OrderDialog({ onClose, products }) {
               </Button>
             </Box>
 
+            {/* Fatura Adresi */}
+            <Box sx={{ mb: 2.5 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                <Avatar sx={{ width: 28, height: 28, bgcolor: '#dc2626', fontSize: 13, fontWeight: 700 }}>2</Avatar>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Fatura Adresi</Typography>
+              </Stack>
+              <FormControlLabel
+                control={<Checkbox checked={billingSame} onChange={e => setBillingSame(e.target.checked)} size="small"
+                  sx={{ '&.Mui-checked': { color: '#dc2626' } }} />}
+                label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Faturamı Aynı Adrese Gönder</Typography>}
+                sx={{ mb: 0.5 }}
+              />
+              {!billingSame && (
+                <Box sx={{ mt: 1 }}>
+                  {billingAddress ? (
+                    <Box sx={{ border: 1, borderColor: '#fca5a5', borderRadius: 2, p: 1.2, mb: 1, bgcolor: '#fef2f2' }}>
+                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', display: 'block' }}>
+                            {billingAddress.invoiceType === 'kurumsal' ? '🏢 Kurumsal' : '👤 Bireysel'} · {billingAddress.title}
+                          </Typography>
+                          {billingAddress.invoiceType === 'kurumsal' ? (
+                            <Typography variant="caption" sx={{ display: 'block' }}>
+                              <strong>{billingAddress.companyTitle}</strong> — VKN: {billingAddress.taxNumber} / {billingAddress.taxOffice}
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" sx={{ display: 'block' }}>
+                              {billingAddress.firstName} {billingAddress.lastName} — TCKN: {billingAddress.tckn}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {billingAddress.address}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      Henüz fatura adresi eklemediniz.
+                    </Typography>
+                  )}
+                  <Button size="small" variant="outlined" onClick={() => setShowBillingForm(true)}
+                    sx={{ fontWeight: 600, textTransform: 'none', borderColor: '#dc2626', color: '#dc2626', borderRadius: 2 }}>
+                    {billingAddress ? '+ Fatura Adresini Değiştir' : '+ Fatura Adresi Ekle'}
+                  </Button>
+                </Box>
+              )}
+            </Box>
+
             {/* Ödeme Bilgisi */}
             <Box sx={{ mb: 2.5 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-                <Avatar sx={{ width: 28, height: 28, bgcolor: '#3b82f6', fontSize: 13, fontWeight: 700 }}>2</Avatar>
+                <Avatar sx={{ width: 28, height: 28, bgcolor: '#3b82f6', fontSize: 13, fontWeight: 700 }}>3</Avatar>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Ödeme</Typography>
                 <LockIcon sx={{ fontSize: 18, color: '#16a34a' }} />
               </Stack>

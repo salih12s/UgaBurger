@@ -53,4 +53,11 @@ router.post('/promo-codes', ctrl.createPromoCode);
 router.put('/promo-codes/:id', ctrl.updatePromoCode);
 router.delete('/promo-codes/:id', ctrl.deletePromoCode);
 
+// E-Fatura / E-Arsiv
+const einvoiceCtrl = require('../controllers/einvoiceController');
+router.post('/einvoice/orders/:id/send', einvoiceCtrl.sendForOrder);
+router.get('/einvoice/orders/:id', einvoiceCtrl.getInvoiceInfo);
+router.get('/einvoice/check/:identifier', einvoiceCtrl.checkPayer);
+router.get('/einvoice/credit', einvoiceCtrl.credit);
+
 module.exports = router;

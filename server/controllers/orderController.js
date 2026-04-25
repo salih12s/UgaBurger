@@ -4,7 +4,12 @@ const sequelize = require('../config/db');
 const createOrder = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { items, order_type, table_id, delivery_address, order_note, payment_method, card_info, address_lat, address_lng } = req.body;
+    const { items, order_type, table_id, delivery_address, order_note, payment_method, card_info, address_lat, address_lng,
+      invoice_type, billing_same_as_delivery, billing_address,
+      billing_tckn, billing_first_name, billing_last_name,
+      billing_company_title, billing_tax_number, billing_tax_office, billing_is_einvoice_payer,
+      billing_email, billing_phone,
+    } = req.body;
 
     // Online sipariş kapalıysa engelle
     const onlineSetting = await Setting.findOne({ where: { key: 'online_order_active' } });
@@ -81,6 +86,19 @@ const createOrder = async (req, res) => {
       card_info: card_info || null,
       promo_code: null,
       discount_amount: 0,
+      // Fatura bilgileri
+      invoice_type: invoice_type === 'kurumsal' ? 'kurumsal' : 'bireysel',
+      billing_same_as_delivery: billing_same_as_delivery !== false,
+      billing_address: billing_address || null,
+      billing_tckn: billing_tckn || null,
+      billing_first_name: billing_first_name || null,
+      billing_last_name: billing_last_name || null,
+      billing_company_title: billing_company_title || null,
+      billing_tax_number: billing_tax_number || null,
+      billing_tax_office: billing_tax_office || null,
+      billing_is_einvoice_payer: !!billing_is_einvoice_payer,
+      billing_email: billing_email || null,
+      billing_phone: billing_phone || null,
     }, { transaction: t });
 
     // Apply promo code if provided

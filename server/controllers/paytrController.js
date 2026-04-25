@@ -20,6 +20,24 @@ const getPaytrToken = async (req, res) => {
     if (order.user_id !== req.user.id) return res.status(403).json({ error: 'Yetkisiz' });
     if (order.payment_status === 'paid') return res.status(400).json({ error: 'Bu sipariş zaten ödenmiş' });
 
+    // ───────── DEV BYPASS ─────────
+    // PAYTR_BYPASS=true ise PayTR'a hiç gitmeden ödemeyi "başarılı" say.
+    // Sadece NODE_ENV=development için izinli. Canlıda yok sayılır.
+    if (process.env.NODE_ENV !== 'production' && process.env.PAYTR_BYPASS === 'true') {
+      const fakeMerchantOid = `BYPASS${order.id}T${Date.now()}`;
+      await order.update({
+        merchant_oid: fakeMerchantOid,
+        payment_status: 'paid',
+        status: 'pending',
+      });
+      console.log(`[BYPASS] Sipariş #${order.id} ödeme atlandı, paid olarak işaretlendi.`);
+      try {
+        const { autoSendInvoiceForOrder } = require('../services/einvoiceHooks');
+        autoSendInvoiceForOrder(order);
+      } catch (e) { console.warn('einvoice hook:', e.message); }
+      return res.json({ bypass: true, order_id: order.id, merchant_oid: fakeMerchantOid });
+    }
+
     const merchantId = process.env.PAYTR_MERCHANT_ID;
     const merchantKey = process.env.PAYTR_MERCHANT_KEY;
     const merchantSalt = process.env.PAYTR_MERCHANT_SALT;
@@ -145,6 +163,11 @@ const paytrCallback = async (req, res) => {
         status: 'pending',
       });
       console.log(`Sipariş #${order.id} ödeme başarılı (PayTR) - Bekleyene düştü`);
+      // Otomatik e-fatura/e-arşiv (fire-and-forget)
+      try {
+        const { autoSendInvoiceForOrder } = require('../services/einvoiceHooks');
+        autoSendInvoiceForOrder(order);
+      } catch (e) { console.warn('einvoice hook:', e.message); }
     } else {
       await order.update({
         payment_status: 'failed',

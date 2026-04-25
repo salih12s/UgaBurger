@@ -82,6 +82,15 @@ const updateOrderStatus = async (req, res) => {
     }
 
     await order.save();
+
+    // Sipariş delivered olduğunda otomatik fatura gönder (ödeme tamamlanmış olmalı)
+    if (status === 'delivered' && order.payment_status === 'paid') {
+      try {
+        const { autoSendInvoiceForOrder } = require('../services/einvoiceHooks');
+        autoSendInvoiceForOrder(order);
+      } catch (e) { console.warn('einvoice hook:', e.message); }
+    }
+
     res.json({ ...order.toJSON(), refund: refundInfo, capture: captureInfo });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
