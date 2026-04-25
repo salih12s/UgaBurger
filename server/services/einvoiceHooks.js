@@ -27,6 +27,23 @@ async function autoSendInvoiceForOrder(order) {
     //            mail.status === 'sent' ise musteri PDF'i aldi -> 'preview_sent'
     //            yoksa -> 'draft'
     //  - diger : 'failed'
+    // Eger ana akis 'failed' dondu ama fallback aktifse, draft preview email'i son care olarak deneyelim.
+    const fallbackEnabled = String(process.env.EINVOICE_PREVIEW_EMAIL_FALLBACK || 'true').toLowerCase() === 'true';
+    if (result.status === 'failed' && fallbackEnabled && order.billing_email) {
+      try {
+        const svc = require('./einvoiceService');
+        if (typeof svc.sendDraftPreviewByEmail === 'function') {
+          const mail = await svc.sendDraftPreviewByEmail(order, { addDraftWatermark: true });
+          result.mail = mail;
+          if (mail && mail.status === 'sent') {
+            result.status = 'draft';
+          }
+        }
+      } catch (mailErr) {
+        console.warn(`[einvoice] Fallback mail hatasi (siparis #${order.id}):`, mailErr.message);
+      }
+    }
+
     let einvoiceStatus;
     let sentAt = null;
     if (result.status === 'sent') {
@@ -46,7 +63,9 @@ async function autoSendInvoiceForOrder(order) {
       einvoice_pdf_url: result.pdfUrl || null,
       einvoice_sent_at: sentAt,
     });
-    console.log(`[einvoice] Sipariş #${order.id} fatura: ${einvoiceStatus} (${result.isEarchive ? 'e-arşiv' : 'e-fatura'})${result.mail ? ` mail=${result.mail.status}` : ''}`);
+    const mailInfo = result.mail ? ` mail=${result.mail.status}` : '';
+    const errInfo = (einvoiceStatus === 'failed' || einvoiceStatus === 'draft') && result.error ? ` err="${result.error}"` : '';
+    console.log(`[einvoice] Siparis #${order.id} fatura: ${einvoiceStatus} (${result.isEarchive ? 'e-arsiv' : 'e-fatura'})${mailInfo}${errInfo}`);
   } catch (err) {
     console.error(`[einvoice] Otomatik gönderim hatası (sipariş #${order?.id}):`, err.message);
   }

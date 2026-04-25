@@ -42,9 +42,13 @@ const updateOrderStatus = async (req, res) => {
     }
 
     // Admin sipariş onayında (pending -> preparing/confirmed) online ödeme provizyonunu kapat
-    // (PayTR hesabı pre-auth modundaysa gereklidir; immediate capture modunda sessizce geçer)
+    // SADECE PayTR hesabı pre-auth modundaysa gerekli. Immediate capture (default) modunda
+    // PayTR endpoint'i HTML/Cloudflare sayfası dönebiliyor; bu çağrıyı atlıyoruz.
+    // Etkinleştirmek için: PAYTR_PREAUTH_MODE=true env'i ekleyin.
+    const preauthEnabled = String(process.env.PAYTR_PREAUTH_MODE || 'false').toLowerCase() === 'true';
     let captureInfo = null;
-    if ((status === 'preparing' || status === 'confirmed')
+    if (preauthEnabled
+        && (status === 'preparing' || status === 'confirmed')
         && order.payment_method === 'online'
         && order.payment_status === 'paid'
         && order.merchant_oid) {
@@ -53,8 +57,9 @@ const updateOrderStatus = async (req, res) => {
         captureInfo = { captured: true };
       } catch (captureErr) {
         // Provizyon kapatma başarısız olsa bile sipariş onayını engelleme (log et, devam et)
-        console.warn(`PayTR capture uyarısı (sipariş #${order.id}):`, captureErr.message);
-        captureInfo = { captured: false, reason: captureErr.message };
+        const shortMsg = String(captureErr.message || '').slice(0, 200);
+        console.warn(`PayTR capture uyarısı (sipariş #${order.id}): ${shortMsg}`);
+        captureInfo = { captured: false, reason: shortMsg };
       }
     }
 
