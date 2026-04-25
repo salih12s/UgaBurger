@@ -70,7 +70,7 @@ function request(method, path, { query, body } = {}) {
       password: c.password,
       ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {}),
     },
-    timeout: 30000,
+    timeout: parseInt(process.env.EINVOICE_HTTP_TIMEOUT_MS, 10) || 60000,
   };
   return new Promise((resolve) => {
     const req = lib.request(opts, (res) => {
@@ -82,8 +82,8 @@ function request(method, path, { query, body } = {}) {
         resolve({ status: res.statusCode, data, raw: buf });
       });
     });
-    req.on('error', (err) => resolve({ status: 0, error: err.code || err.message }));
-    req.on('timeout', () => { req.destroy(); resolve({ status: 0, error: 'TIMEOUT' }); });
+    req.on('error', (err) => resolve({ status: 0, error: `${err.code || err.message} (${method} ${url.host}${url.pathname})` }));
+    req.on('timeout', () => { req.destroy(); resolve({ status: 0, error: `TIMEOUT (${method} ${url.host}${url.pathname})` }); });
     if (payload) req.write(payload);
     req.end();
   });
