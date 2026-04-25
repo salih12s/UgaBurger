@@ -52,7 +52,7 @@ const Order = sequelize.define('Order', {
   // --- E-Fatura entegrasyon çıktıları (Bölüm 2'de kullanılacak) ---
   einvoice_uuid: { type: DataTypes.STRING(64), allowNull: true, defaultValue: null },
   einvoice_status: {
-    type: DataTypes.ENUM('none', 'pending', 'sent', 'failed', 'delivered'),
+    type: DataTypes.ENUM('none', 'pending', 'sent', 'failed', 'delivered', 'draft', 'preview_sent'),
     defaultValue: 'none',
   },
   einvoice_error: { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
