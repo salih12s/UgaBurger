@@ -94,10 +94,11 @@ app.get('/api/_diag/outbound-ip', async (req, res) => {
   let dnsResult = null;
   try { dnsResult = await dns.lookup('portaltest.aktifdonusum.com', { all: true }); } catch (e) { dnsResult = { error: e.code || e.message }; }
 
-  const [ip4, ip6, tcp443, httpRoot, apiCall] = await Promise.all([
+  const [ip4, ip6, tcp443, tcp443p, httpRoot, apiCall] = await Promise.all([
     httpGet('api.ipify.org', '/'),
     httpGet('api64.ipify.org', '/'),
     tcpTest('portaltest.aktifdonusum.com', 443),
+    tcpTest('portal.aktifdonusum.com', 443),
     httpGet('portaltest.aktifdonusum.com', '/edonusum/'),
     httpAuthGet('portaltest.aktifdonusum.com', '/edonusum/api/document/customerCredit?creditType=KONTOR'),
   ]);
@@ -106,7 +107,8 @@ app.get('/api/_diag/outbound-ip', async (req, res) => {
     outbound_ipv4: ip4.body,
     outbound_ipv6: ip6.body,
     aktifdonusum_dns: dnsResult,
-    aktifdonusum_tcp_443: tcp443,
+    aktifdonusum_tcp_443_TEST: tcp443,
+    aktifdonusum_tcp_443_CANLI: tcp443p,
     aktifdonusum_http_root: httpRoot,
     aktifdonusum_api_customerCredit: apiCall,
   });
