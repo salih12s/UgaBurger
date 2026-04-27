@@ -51,21 +51,64 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 // Aktif Donusum'a whitelist icin bildirilecek IP buradan alinir.
 app.get('/api/_diag/outbound-ip', async (req, res) => {
   const https = require('https');
-  const get = (host, path) => new Promise((resolve) => {
-    const r = https.request({ hostname: host, path, method: 'GET', timeout: 8000 }, (resp) => {
-      let b = ''; resp.on('data', c => b += c); resp.on('end', () => resolve({ ok: true, status: resp.statusCode, body: b.slice(0, 200) }));
+  const net = require('net');
+  const dns = require('dns').promises;
+
+  const httpGet = (host, path, opts = {}) => new Promise((resolve) => {
+    const start = Date.now();
+    const r = https.request({ hostname: host, path, method: 'GET', timeout: 8000, ...opts }, (resp) => {
+      let b = ''; resp.on('data', c => b += c); resp.on('end', () => resolve({ ok: true, status: resp.statusCode, ms: Date.now() - start, body: b.slice(0, 200) }));
     });
-    r.on('error', e => resolve({ ok: false, error: e.code || e.message }));
-    r.on('timeout', () => { r.destroy(); resolve({ ok: false, error: 'TIMEOUT' }); });
+    r.on('error', e => resolve({ ok: false, error: e.code || e.message, ms: Date.now() - start }));
+    r.on('timeout', () => { r.destroy(); resolve({ ok: false, error: 'TIMEOUT', ms: Date.now() - start }); });
     r.end();
   });
-  const ip4 = await get('api.ipify.org', '/');
-  const ip6 = await get('api64.ipify.org', '/');
-  const aktif = await get('portaltest.aktifdonusum.com', '/edonusum/');
+
+  const tcpTest = (host, port) => new Promise((resolve) => {
+    const start = Date.now();
+    const sock = new net.Socket();
+    sock.setTimeout(5000);
+    sock.once('connect', () => { sock.destroy(); resolve({ ok: true, ms: Date.now() - start }); });
+    sock.once('timeout', () => { sock.destroy(); resolve({ ok: false, error: 'TIMEOUT', ms: Date.now() - start }); });
+    sock.once('error', (e) => resolve({ ok: false, error: e.code || e.message, ms: Date.now() - start }));
+    sock.connect(port, host);
+  });
+
+  const httpAuthGet = (host, path) => new Promise((resolve) => {
+    const start = Date.now();
+    const r = https.request({
+      hostname: host, path, method: 'GET', timeout: 12000,
+      headers: {
+        Accept: 'application/json',
+        username: process.env.EINVOICE_USERNAME || '',
+        password: process.env.EINVOICE_PASSWORD || '',
+      },
+    }, (resp) => {
+      let b = ''; resp.on('data', c => b += c); resp.on('end', () => resolve({ ok: true, status: resp.statusCode, ms: Date.now() - start, body: b.slice(0, 300) }));
+    });
+    r.on('error', e => resolve({ ok: false, error: e.code || e.message, ms: Date.now() - start }));
+    r.on('timeout', () => { r.destroy(); resolve({ ok: false, error: 'TIMEOUT', ms: Date.now() - start }); });
+    r.end();
+  });
+
+  let dnsResult = null;
+  try { dnsResult = await dns.lookup('portaltest.aktifdonusum.com', { all: true }); } catch (e) { dnsResult = { error: e.code || e.message }; }
+
+  const [ip4, ip6, tcp443, httpRoot, apiCall] = await Promise.all([
+    httpGet('api.ipify.org', '/'),
+    httpGet('api64.ipify.org', '/'),
+    tcpTest('portaltest.aktifdonusum.com', 443),
+    httpGet('portaltest.aktifdonusum.com', '/edonusum/'),
+    httpAuthGet('portaltest.aktifdonusum.com', '/edonusum/api/document/customerCredit?creditType=KONTOR'),
+  ]);
+
   res.json({
     outbound_ipv4: ip4.body,
     outbound_ipv6: ip6.body,
-    aktifdonusum_reachable: aktif.ok ? `HTTP ${aktif.status}` : aktif.error,
+    aktifdonusum_dns: dnsResult,
+    aktifdonusum_tcp_443: tcp443,
+    aktifdonusum_http_root: httpRoot,
+    aktifdonusum_api_customerCredit: apiCall,
   });
 });
 
