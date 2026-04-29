@@ -34,8 +34,20 @@ export default function Reports() {
     return d.toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  const paymentLabel = (m, type) => {
-    if (m === 'online') return '💳 Kart';
+  // Siparişin nakit/kart kırılımı (kısmi ödeme dahil)
+  const splitParts = (o) => {
+    const tot = parseFloat(o.total_amount) || 0;
+    const caRaw = o.cash_amount;
+    const ca = (caRaw === null || caRaw === undefined || caRaw === '') ? null : parseFloat(caRaw);
+    if (ca !== null && !isNaN(ca) && ca > 0 && ca < tot) return { cash: ca, card: tot - ca, isSplit: true };
+    if (o.payment_method === 'card' || o.payment_method === 'online') return { cash: 0, card: tot, isSplit: false };
+    return { cash: tot, card: 0, isSplit: false };
+  };
+
+  const paymentLabel = (o) => {
+    const { cash, card, isSplit } = splitParts(o);
+    if (isSplit) return `💵 ${cash.toFixed(2)} ₺ + 💳 ${card.toFixed(2)} ₺`;
+    if (card > 0) return '💳 Kart';
     return '💵 Nakit';
   };
   const statusLabels = { pending: 'Bekleyen', confirmed: 'Onaylanan', preparing: 'Hazırlanıyor', ready: 'Hazır', delivered: 'Teslim Edildi', cancelled: 'İptal' };
@@ -45,12 +57,20 @@ export default function Reports() {
   const onlineOrders = report.orderDetails?.filter(o => o.order_type === 'online') || [];
   const tableOrders = report.orderDetails?.filter(o => o.order_type === 'table') || [];
 
-  // Ödeme yöntemi filtresi (Kart = online/card, Nakit = cash/door)
+  // Ödeme yöntemi filtresi (split siparişler her iki taraftan da görünür)
   // Default: ikisi de seçili. İkisi de kapalıysa veri gösterilmesin.
   const paymentMatches = (o) => {
-    const isCard = o.payment_method === 'online' || o.payment_method === 'card';
-    if (isCard) return showCard;
-    return showCash;
+    const { cash, card } = splitParts(o);
+    return (showCash && cash > 0) || (showCard && card > 0);
+  };
+
+  // Filtre uygulandığında siparişin gösterilen/sayılan tutarı (sadece seçili kısımları toplar)
+  const visibleAmount = (o) => {
+    const { cash, card } = splitParts(o);
+    let amt = 0;
+    if (showCash) amt += cash;
+    if (showCard) amt += card;
+    return amt;
   };
 
   // Filtre: masa numarası, ismi veya müşteri adı
@@ -72,11 +92,17 @@ export default function Reports() {
   const isFiltered = searchFilter.trim() !== '' || !showCash || !showCard;
 
   const displayTotalOrders = isFiltered ? filteredOnlineOrders.length + filteredTableOrders.length : report.totalOrders;
-  const displayTotalRevenue = isFiltered ? [...filteredOnlineOrders, ...filteredTableOrders].reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.totalRevenue);
+  const displayTotalRevenue = isFiltered
+    ? [...filteredOnlineOrders, ...filteredTableOrders].reduce((s, o) => s + visibleAmount(o), 0)
+    : parseFloat(report.totalRevenue);
   const displayOnlineCount = isFiltered ? filteredOnlineOrders.length : report.onlineOrders;
-  const displayOnlineRevenue = isFiltered ? filteredOnlineOrders.reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.onlineRevenue || 0);
+  const displayOnlineRevenue = isFiltered
+    ? filteredOnlineOrders.reduce((s, o) => s + visibleAmount(o), 0)
+    : parseFloat(report.onlineRevenue || 0);
   const displayTableCount = isFiltered ? filteredTableOrders.length : report.tableOrders;
-  const displayTableRevenue = isFiltered ? filteredTableOrders.reduce((s, o) => s + parseFloat(o.total_amount), 0) : parseFloat(report.tableRevenue || 0);
+  const displayTableRevenue = isFiltered
+    ? filteredTableOrders.reduce((s, o) => s + visibleAmount(o), 0)
+    : parseFloat(report.tableRevenue || 0);
 
   const stats = [
     { label: 'Toplam Sipariş', value: displayTotalOrders, color: '#3b82f6' },
@@ -120,7 +146,7 @@ export default function Reports() {
                 ))}
               </Typography>
             </TableCell>
-            <TableCell><Typography variant="caption">{paymentLabel(o.payment_method, o.order_type)}</Typography></TableCell>
+            <TableCell><Typography variant="caption">{paymentLabel(o)}</Typography></TableCell>
             <TableCell><Chip label={statusLabels[o.status] || o.status} size="small" sx={{ fontSize: 11, fontWeight: 600 }} /></TableCell>
             <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{parseFloat(o.total_amount).toFixed(2)} ₺</TableCell>
             <TableCell sx={{ color: '#dc2626', fontWeight: 600, whiteSpace: 'nowrap' }}>{parseFloat(o.discount_amount || 0) > 0 ? `-${parseFloat(o.discount_amount).toFixed(2)} ₺` : '-'}</TableCell>

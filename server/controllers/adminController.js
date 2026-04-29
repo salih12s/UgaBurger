@@ -106,7 +106,7 @@ const updateOrderStatus = async (req, res) => {
 const createQuickOrder = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { items, table_id, order_note, payment_method, customer_name, customer_phone, delivery_address } = req.body;
+    const { items, table_id, order_note, payment_method, customer_name, customer_phone, delivery_address, cash_amount } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Ürün seçiniz' });
@@ -130,6 +130,32 @@ const createQuickOrder = async (req, res) => {
       orderItemsData.push({ product_id: item.product_id, quantity: item.quantity, unit_price: unitPrice, extras });
     }
 
+    // --- Split payment (kısmi nakit) hesaplama ---
+    // cash_amount: müşteriden alınan nakit tutar. 0 < cash_amount < total ise kalan kısmı kart sayılır.
+    let parsedCash = (cash_amount === undefined || cash_amount === null || cash_amount === '') ? null : parseFloat(cash_amount);
+    if (parsedCash !== null && (isNaN(parsedCash) || parsedCash < 0)) parsedCash = null;
+    if (parsedCash !== null && parsedCash > total_amount) parsedCash = total_amount;
+
+    let resolvedPaymentMethod;
+    let resolvedPaymentStatus;
+    let storedCashAmount = null;
+    if (parsedCash !== null && parsedCash > 0 && parsedCash < total_amount) {
+      // Split: nakit + kart
+      resolvedPaymentMethod = 'card';
+      resolvedPaymentStatus = 'paid';
+      storedCashAmount = parsedCash;
+    } else if (parsedCash !== null && parsedCash >= total_amount && total_amount > 0) {
+      // Tamamı nakit (split kutusu doldurulmuş ama tüm tutar)
+      resolvedPaymentMethod = 'door';
+      resolvedPaymentStatus = 'pending';
+      storedCashAmount = null;
+    } else {
+      // cash_amount yok veya 0 → seçili payment_method'u kullan
+      resolvedPaymentMethod = payment_method === 'card' ? 'card' : 'door';
+      resolvedPaymentStatus = payment_method === 'card' ? 'paid' : 'pending';
+      storedCashAmount = null;
+    }
+
     const order = await Order.create({
       user_id: null,
       order_type: 'table',
@@ -138,8 +164,9 @@ const createQuickOrder = async (req, res) => {
       total_amount,
       order_note: order_note || '',
       status: 'preparing',
-      payment_status: payment_method === 'card' ? 'paid' : 'pending',
-      payment_method: payment_method === 'card' ? 'card' : 'door',
+      payment_status: resolvedPaymentStatus,
+      payment_method: resolvedPaymentMethod,
+      cash_amount: storedCashAmount,
       customer_name: customer_name || null,
       customer_phone: customer_phone || null,
     }, { transaction: t });
@@ -366,6 +393,22 @@ const getDailyReport = async (req, res) => {
     const onlineRevenue = onlineOrdersList.reduce((sum, o) => sum + parseFloat(o.total_amount), 0);
     const tableRevenue = tableOrdersList.reduce((sum, o) => sum + parseFloat(o.total_amount), 0);
 
+    // Nakit/Kart kırılımı (split ödemeler dahil)
+    let cashRevenue = 0;
+    let cardRevenue = 0;
+    for (const o of orders) {
+      const tot = parseFloat(o.total_amount) || 0;
+      const ca = (o.cash_amount === null || o.cash_amount === undefined) ? null : parseFloat(o.cash_amount);
+      if (ca !== null && ca > 0 && ca < tot) {
+        cashRevenue += ca;
+        cardRevenue += tot - ca;
+      } else if (o.payment_method === 'card' || o.payment_method === 'online') {
+        cardRevenue += tot;
+      } else {
+        cashRevenue += tot;
+      }
+    }
+
     // Product stats - indirim oranına göre düzeltilmiş
     const productStats = {};
     for (const order of orders) {
@@ -396,6 +439,7 @@ const getDailyReport = async (req, res) => {
       total_amount: o.total_amount,
       status: o.status,
       payment_method: o.payment_method,
+      cash_amount: o.cash_amount,
       created_at: o.createdAt,
       user: o.user,
       table: o.table,
@@ -421,6 +465,8 @@ const getDailyReport = async (req, res) => {
       tableOrders,
       onlineRevenue,
       tableRevenue,
+      cashRevenue,
+      cardRevenue,
       avgOrderAmount: totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : 0,
       productStats: Object.values(productStats).sort((a, b) => b.quantity - a.quantity),
       orderDetails,

@@ -221,7 +221,16 @@ export default function OrderManagement() {
     return d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const paymentLabel = (m, type) => {
+  const paymentLabel = (m, type, order) => {
+    // Kısmi (split) ödeme: cash_amount dolu ve toplamdan küçükse
+    if (order) {
+      const tot = parseFloat(order.total_amount) || 0;
+      const caRaw = order.cash_amount;
+      const ca = (caRaw === null || caRaw === undefined || caRaw === '') ? null : parseFloat(caRaw);
+      if (ca !== null && !isNaN(ca) && ca > 0 && ca < tot) {
+        return `💵 ${ca.toFixed(2)} TL + 💳 ${(tot - ca).toFixed(2)} TL`;
+      }
+    }
     // Masa siparişi: fiziksel POS veya nakit
     if (type === 'table') {
       if (m === 'online' || m === 'card') return '💳 Kart (POS)';
@@ -245,7 +254,7 @@ export default function OrderManagement() {
         : `📱 TELEFON SİPARİŞİ`;
     const customer = order.user ? `${order.user.first_name} ${order.user.last_name}` : (order.customer_name || '-');
     const phone = order.user?.phone || order.customer_phone || '';
-    const payment = paymentLabel(order.payment_method, order.order_type);
+    const payment = paymentLabel(order.payment_method, order.order_type, order);
 
     const rTitle = settings.receipt_title || 'MUSATTI BURGER';
     const rFooter = settings.receipt_footer || 'Afiyet Olsun!';
@@ -423,7 +432,7 @@ export default function OrderManagement() {
 
               <Divider sx={{ mb: 1 }} />
               <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-                <Typography variant="caption">Ödeme: <b>{paymentLabel(order.payment_method, order.order_type)}</b></Typography>
+                <Typography variant="caption">Ödeme: <b>{paymentLabel(order.payment_method, order.order_type, order)}</b></Typography>
                 {order.order_type !== 'table' && (
                   <Typography variant="caption">
                     Ödeme Durumu: <Chip label={paymentStatusLabel(order.payment_status)} size="small"

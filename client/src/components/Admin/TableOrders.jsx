@@ -18,6 +18,7 @@ export default function TableOrders() {
   const [cartItems, setCartItems] = useState([]);
   const [orderNote, setOrderNote] = useState('');
   const [paymentType, setPaymentType] = useState('cash');
+  const [cashSplitAmount, setCashSplitAmount] = useState(''); // Kısmi nakit (split): boşsa tam ödeme
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -105,7 +106,18 @@ export default function TableOrders() {
         : `📱 TELEFON SİPARİŞİ`;
     const customer = order.customer_name || '-';
     const phone = order.customer_phone || '';
-    const payment = order.payment_method === 'online' ? '💳 Kart' : '💵 Nakit';
+    // Ödeme bilgisi (split / kısmi nakit dahil)
+    const totAmt = parseFloat(order.total_amount) || 0;
+    const cashAmtRaw = order.cash_amount;
+    const cashAmt = (cashAmtRaw === null || cashAmtRaw === undefined || cashAmtRaw === '') ? null : parseFloat(cashAmtRaw);
+    let payment;
+    if (cashAmt !== null && !isNaN(cashAmt) && cashAmt > 0 && cashAmt < totAmt) {
+      payment = `💵 Nakit: ${cashAmt.toFixed(2)} TL  +  💳 Kart: ${(totAmt - cashAmt).toFixed(2)} TL`;
+    } else if (order.payment_method === 'online' || order.payment_method === 'card') {
+      payment = '💳 Kart';
+    } else {
+      payment = '💵 Nakit';
+    }
 
     const rTitle = settings.receipt_title || 'UGA BURGER';
     const rFooter = settings.receipt_footer || 'Afiyet Olsun!';
@@ -186,6 +198,13 @@ export default function TableOrders() {
   const submitQuickOrder = async () => {
     if (!selectedTable) { toast.error('Masa seçiniz'); return; }
     if (cartItems.length === 0) { toast.error('Ürün seçiniz'); return; }
+    // Kısmi nakit doğrulaması
+    let cashAmt = parseFloat(cashSplitAmount);
+    if (cashSplitAmount === '' || isNaN(cashAmt) || cashAmt <= 0) cashAmt = null;
+    if (cashAmt !== null && cashAmt > cartTotal) {
+      toast.error('Nakit tutar toplamdan büyük olamaz');
+      return;
+    }
     try {
       const res = await api.post('/admin/quick-order', {
         items: cartItems.map(i => ({
@@ -195,6 +214,7 @@ export default function TableOrders() {
         table_id: selectedTable ? parseInt(selectedTable) : null,
         order_note: orderNote,
         payment_method: paymentType,
+        cash_amount: cashAmt,
         customer_name: customerName || null,
         customer_phone: customerPhone || null,
         delivery_address: customerAddress || null,
@@ -202,6 +222,7 @@ export default function TableOrders() {
       toast.success('Hızlı sipariş oluşturuldu!');
       setCartItems([]); setOrderNote(''); setSelectedTable(''); setPaymentType('cash');
       setCustomerName(''); setCustomerPhone(''); setCustomerAddress('');
+      setCashSplitAmount('');
       if (settings.receipt_auto_print !== 'false') {
         setTimeout(() => printReceipt(res.data), 100);
       }
@@ -306,6 +327,36 @@ export default function TableOrders() {
               💳 Kart
             </Button>
           </Stack>
+
+          {/* Kısmi (split) nakit ödeme: müşteri bir kısmını nakit, kalanını kart öderse */}
+          <Box sx={{ mb: 1, p: 1, borderRadius: 1, border: '1px dashed #d1d5db', bgcolor: '#fafafa' }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                Bakiyeden Nakit Düşür
+              </Typography>
+              <TextField
+                size="small"
+                type="number"
+                inputProps={{ min: 0, step: '0.01' }}
+                placeholder="0"
+                value={cashSplitAmount}
+                onChange={e => setCashSplitAmount(e.target.value)}
+                sx={{ width: 110 }}
+              />
+              <Typography variant="caption" sx={{ color: '#666' }}>TL</Typography>
+            </Stack>
+            {(() => {
+              const c = parseFloat(cashSplitAmount);
+              if (!isNaN(c) && c > 0 && c < cartTotal) {
+                return (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#3b82f6', fontWeight: 600 }}>
+                    Kart tutarı: {(cartTotal - c).toFixed(2)} TL
+                  </Typography>
+                );
+              }
+              return null;
+            })()}
+          </Box>
 
           <Stack direction="row" justifyContent="space-between" sx={{ my: 1 }}>
             <Typography sx={{ fontWeight: 800, fontSize: 16 }}>Toplam</Typography>

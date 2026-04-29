@@ -21,6 +21,9 @@ const Order = sequelize.define('Order', {
     type: DataTypes.ENUM('door', 'online', 'card'),
     defaultValue: 'door',
   },
+  // Kısmi nakit tutarı (split payment). null ise tüm tutar payment_method'a göredir.
+  // 0 < cash_amount < total_amount ise: cash_amount kadar nakit, kalan kart olarak değerlendirilir.
+  cash_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: true, defaultValue: null },
   total_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   order_note: { type: DataTypes.TEXT, defaultValue: '' },
   card_info: { type: DataTypes.JSON, defaultValue: null },
