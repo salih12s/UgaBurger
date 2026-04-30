@@ -4,7 +4,8 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 export function getImageUrl(path) {
   if (!path) return '';
-  if (path.startsWith('http')) return path;
+  // data: (base64), http(s):, blob: URL'lerini olduğu gibi döndür
+  if (path.startsWith('data:') || path.startsWith('http') || path.startsWith('blob:')) return path;
   return `${API_URL}${path}`;
 }
 

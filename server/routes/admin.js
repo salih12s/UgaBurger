@@ -34,8 +34,18 @@ router.post('/extras', ctrl.createExtra);
 router.put('/extras/:id', ctrl.updateExtra);
 router.delete('/extras/:id', ctrl.deleteExtra);
 
-// Image upload
-router.post('/upload', ctrl.upload.single('image'), ctrl.uploadImage);
+// Image upload (multer hatalarını anlamlı mesajla döndür)
+router.post('/upload', (req, res, next) => {
+  ctrl.upload.single('image')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Dosya boyutu çok büyük (maks. 8 MB). Lütfen daha küçük bir görsel seçin.' });
+      }
+      return res.status(400).json({ error: err.message || 'Yükleme hatası' });
+    }
+    next();
+  });
+}, ctrl.uploadImage);
 
 // Reports
 router.get('/reports/daily', ctrl.getDailyReport);

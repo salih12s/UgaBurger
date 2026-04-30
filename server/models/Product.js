@@ -7,7 +7,10 @@ const Product = sequelize.define('Product', {
   name: { type: DataTypes.STRING(200), allowNull: false },
   description: { type: DataTypes.TEXT, defaultValue: '' },
   price: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
-  image_url: { type: DataTypes.STRING(500), defaultValue: '' },
+  // TEXT: hem URL ('/uploads/...', '/images/...') hem de 'data:image/...;base64,...' içerebilir.
+  // Base64 data URL'leri kalıcı olarak DB'de saklayarak Railway/Plesk gibi
+  // ephemeral diskli ortamlarda restart/deploy sonrası resim kaybını önler.
+  image_url: { type: DataTypes.TEXT('long'), defaultValue: '' },
   is_available: { type: DataTypes.BOOLEAN, defaultValue: true },
   is_suggested: { type: DataTypes.BOOLEAN, defaultValue: false },
   sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },

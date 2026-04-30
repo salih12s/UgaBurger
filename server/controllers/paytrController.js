@@ -31,10 +31,7 @@ const getPaytrToken = async (req, res) => {
         status: 'pending',
       });
       console.log(`[BYPASS] Sipariş #${order.id} ödeme atlandı, paid olarak işaretlendi.`);
-      try {
-        const { autoSendInvoiceForOrder } = require('../services/einvoiceHooks');
-        autoSendInvoiceForOrder(order);
-      } catch (e) { console.warn('einvoice hook:', e.message); }
+      // NOT: Otomatik e-fatura tetikleme buradan kaldırıldı; admin siparişi onayladığında gönderilecek.
       return res.json({ bypass: true, order_id: order.id, merchant_oid: fakeMerchantOid });
     }
 
@@ -163,11 +160,7 @@ const paytrCallback = async (req, res) => {
         status: 'pending',
       });
       console.log(`Sipariş #${order.id} ödeme başarılı (PayTR) - Bekleyene düştü`);
-      // Otomatik e-fatura/e-arşiv (fire-and-forget)
-      try {
-        const { autoSendInvoiceForOrder } = require('../services/einvoiceHooks');
-        autoSendInvoiceForOrder(order);
-      } catch (e) { console.warn('einvoice hook:', e.message); }
+      // NOT: Otomatik e-fatura tetikleme buradan kaldırıldı; admin siparişi onayladığında gönderilecek.
     } else {
       await order.update({
         payment_status: 'failed',

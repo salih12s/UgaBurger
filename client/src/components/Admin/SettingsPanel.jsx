@@ -368,7 +368,14 @@ export default function SettingsPanel() {
               <input type="file" hidden accept="image/*" onChange={async e => {
                 const file = e.target.files[0]; if (!file) return;
                 const fd = new FormData(); fd.append('image', file);
-                try { const res = await api.post('/admin/upload', fd); upd('hero_image', res.data.url); toast.success('Yüklendi'); } catch { toast.error('Hata'); }
+                try {
+                  const res = await api.post('/admin/upload', fd);
+                  upd('hero_image', res.data.url);
+                  toast.success('Yüklendi');
+                } catch (err) {
+                  const msg = err?.response?.data?.error || err?.message || 'Yükleme hatası';
+                  toast.error(msg);
+                }
               }} />
             </Button>
             <Typography variant="caption" color="text.secondary">{s('hero_image') ? 'Mevcut: ' + s('hero_image').split('/').pop() : 'Dosya seçilmedi'}</Typography>

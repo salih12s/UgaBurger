@@ -31,7 +31,7 @@ const register = async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role, addresses: [] },
+      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role, addresses: [], billing_addresses: [] },
     });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
@@ -63,10 +63,12 @@ const login = async (req, res) => {
     );
 
     let addrs = [];
+    let billing = [];
     try { addrs = JSON.parse(user.addresses || '[]'); } catch {}
+    try { billing = JSON.parse(user.billing_addresses || '[]'); } catch {}
     res.json({
       token,
-      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role, addresses: addrs },
+      user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone, role: user.role, addresses: addrs, billing_addresses: billing },
     });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
@@ -76,11 +78,12 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'addresses'],
+      attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'addresses', 'billing_addresses'],
     });
     if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     const u = user.toJSON();
     try { u.addresses = JSON.parse(u.addresses || '[]'); } catch { u.addresses = []; }
+    try { u.billing_addresses = JSON.parse(u.billing_addresses || '[]'); } catch { u.billing_addresses = []; }
     res.json(u);
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -91,12 +94,14 @@ const updateProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
     if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
-    const { addresses } = req.body;
+    const { addresses, billing_addresses } = req.body;
     if (addresses !== undefined) user.addresses = JSON.stringify(addresses);
+    if (billing_addresses !== undefined) user.billing_addresses = JSON.stringify(billing_addresses);
     await user.save();
     const u = user.toJSON();
     try { u.addresses = JSON.parse(u.addresses || '[]'); } catch { u.addresses = []; }
-    res.json({ id: u.id, first_name: u.first_name, last_name: u.last_name, email: u.email, phone: u.phone, role: u.role, addresses: u.addresses });
+    try { u.billing_addresses = JSON.parse(u.billing_addresses || '[]'); } catch { u.billing_addresses = []; }
+    res.json({ id: u.id, first_name: u.first_name, last_name: u.last_name, email: u.email, phone: u.phone, role: u.role, addresses: u.addresses, billing_addresses: u.billing_addresses });
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası' });
   }

@@ -10,6 +10,7 @@ const User = sequelize.define('User', {
   password_hash: { type: DataTypes.STRING(255), allowNull: true },
   role: { type: DataTypes.ENUM('customer', 'admin'), defaultValue: 'customer' },
   addresses: { type: DataTypes.TEXT, allowNull: true, defaultValue: '[]' },
+  billing_addresses: { type: DataTypes.TEXT, allowNull: true, defaultValue: '[]' },
   google_id: { type: DataTypes.STRING(255), allowNull: true, unique: true },
   reset_token: { type: DataTypes.STRING(255), allowNull: true, defaultValue: null },
   reset_token_expires: { type: DataTypes.DATE, allowNull: true, defaultValue: null },

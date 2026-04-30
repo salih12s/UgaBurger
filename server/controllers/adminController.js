@@ -33,6 +33,7 @@ const updateOrderStatus = async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı' });
 
     const { status, table_id } = req.body;
+    const prevStatus = order.status;
     if (status) order.status = status;
     if (table_id !== undefined) order.table_id = table_id || null;
 
@@ -88,8 +89,14 @@ const updateOrderStatus = async (req, res) => {
 
     await order.save();
 
-    // Sipariş delivered olduğunda otomatik fatura gönder (ödeme tamamlanmış olmalı)
-    if (status === 'delivered' && order.payment_status === 'paid') {
+    // Admin sipariş onayında otomatik e-fatura/e-arşiv:
+    //  - pending → onaylandı (preparing/confirmed/ready/out_for_delivery/delivered) geçişinde
+    //  - online ödeme (paid) ise tetikle
+    //  - hook kendi içinde dedupe yapar (zaten 'sent'/'delivered' ise atlar)
+    const approvedStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+    if (status && status !== prevStatus
+        && approvedStatuses.includes(status)
+        && order.payment_status === 'paid') {
       try {
         const { autoSendInvoiceForOrder } = require('../services/einvoiceHooks');
         autoSendInvoiceForOrder(order);
@@ -343,24 +350,29 @@ const deleteExtra = async (req, res) => {
 };
 
 // --- IMAGE UPLOAD ---
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+// NOT: Önceden multer.diskStorage ile resimler server/uploads/ klasörüne kaydediliyordu.
+// Railway / Plesk Node container gibi ephemeral filesystem'lerde bu klasör her
+// yeniden başlatma / deploy sonrası siliniyor ve menüdeki resimler bozuluyordu.
+// Artık dosyayı bellekte tutup base64 data URL olarak DB'ye kaydediyoruz; böylece
+// resim ürünle birlikte kalıcı oluyor.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB (hero/arkaplan fotoğrafları için)
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    if (ext && mime) cb(null, true);
+    else cb(new Error('Sadece resim dosyaları yüklenebilir'));
   },
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|webp/;
-  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mime = allowed.test(file.mimetype);
-  if (ext && mime) cb(null, true);
-  else cb(new Error('Sadece resim dosyaları yüklenebilir'));
-}});
 
 const uploadImage = (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Dosya bulunamadı' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  const mime = req.file.mimetype || 'image/jpeg';
+  const base64 = req.file.buffer.toString('base64');
+  const dataUrl = `data:${mime};base64,${base64}`;
+  res.json({ url: dataUrl });
 };
 
 // --- REPORTS ---

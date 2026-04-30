@@ -13,6 +13,7 @@ import WorkIcon from '@mui/icons-material/Work';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import toast from 'react-hot-toast';
 import AddressFormDialog from '../Cart/AddressFormDialog';
+import BillingAddressDialog from '../Cart/BillingAddressDialog';
 import { Button } from '@mui/material';
 
 const statusLabels = {
@@ -35,6 +36,12 @@ export default function ProfilePage() {
   const [editIdx, setEditIdx] = useState(-1);
   const [editAddress, setEditAddress] = useState(null);
 
+  // Fatura adresleri
+  const [billingAddresses, setBillingAddresses] = useState([]);
+  const [billingDialog, setBillingDialog] = useState(false);
+  const [editBillingIdx, setEditBillingIdx] = useState(-1);
+  const [editBillingAddress, setEditBillingAddress] = useState(null);
+
   useEffect(() => {
     api.get('/orders/my').then(res => { setOrders(res.data); setLoading(false); }).catch(() => setLoading(false));
   }, []);
@@ -42,6 +49,9 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user?.addresses && Array.isArray(user.addresses)) {
       setAddresses(user.addresses);
+    }
+    if (user?.billing_addresses && Array.isArray(user.billing_addresses)) {
+      setBillingAddresses(user.billing_addresses);
     }
   }, [user]);
 
@@ -56,8 +66,22 @@ export default function ProfilePage() {
     }
   };
 
+  const saveBillingAddresses = async (newList) => {
+    try {
+      await api.put('/auth/profile', { billing_addresses: newList });
+      setBillingAddresses(newList);
+      if (refreshUser) refreshUser();
+      toast.success('Fatura adresleri güncellendi');
+    } catch {
+      toast.error('Fatura adresi kaydedilemedi');
+    }
+  };
+
   const openAddDialog = () => { setEditIdx(-1); setEditAddress(null); setAddrDialog(true); };
   const openEditDialog = (idx) => { setEditIdx(idx); setEditAddress(addresses[idx]); setAddrDialog(true); };
+
+  const openAddBillingDialog = () => { setEditBillingIdx(-1); setEditBillingAddress(null); setBillingDialog(true); };
+  const openEditBillingDialog = (idx) => { setEditBillingIdx(idx); setEditBillingAddress(billingAddresses[idx]); setBillingDialog(true); };
 
   const handleSaveAddr = (addressData) => {
     const newList = [...addresses];
@@ -73,6 +97,22 @@ export default function ProfilePage() {
   const handleDeleteAddr = (idx) => {
     const newList = addresses.filter((_, i) => i !== idx);
     saveAddresses(newList);
+  };
+
+  const handleSaveBilling = (addressData) => {
+    const newList = [...billingAddresses];
+    if (editBillingIdx >= 0) {
+      newList[editBillingIdx] = addressData;
+    } else {
+      newList.push(addressData);
+    }
+    saveBillingAddresses(newList);
+    setBillingDialog(false);
+  };
+
+  const handleDeleteBilling = (idx) => {
+    const newList = billingAddresses.filter((_, i) => i !== idx);
+    saveBillingAddresses(newList);
   };
 
   const formatDate = (d) => new Date(d).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -142,6 +182,55 @@ export default function ProfilePage() {
         onClose={() => setAddrDialog(false)}
         onSave={handleSaveAddr}
         editAddress={editAddress}
+      />
+
+      {/* Fatura Adreslerim */}
+      <Card sx={{ p: 3, mb: 3 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>Fatura Adreslerim</Typography>
+          <Button size="small" startIcon={<AddIcon />} onClick={openAddBillingDialog} sx={{ fontWeight: 600, textTransform: 'none' }}>Yeni Fatura Adresi</Button>
+        </Stack>
+        {billingAddresses.length === 0 ? (
+          <Box sx={{ p: 2.5, border: '2px dashed #e5e7eb', borderRadius: 2, textAlign: 'center', cursor: 'pointer' }} onClick={openAddBillingDialog}>
+            <LocationOnIcon sx={{ fontSize: 32, color: '#9ca3af', mb: 0.5 }} />
+            <Typography variant="body2" color="text.secondary">Henüz kayıtlı fatura adresiniz yok</Typography>
+            <Typography variant="caption" color="primary">+ Fatura Adresi Ekle</Typography>
+          </Box>
+        ) : (
+          billingAddresses.map((a, i) => (
+            <Box key={i} sx={{ border: 1, borderColor: '#e5e7eb', borderRadius: 2, p: 1.5, mb: 1, '&:hover': { borderColor: '#3b82f6', bgcolor: '#f8fafc' } }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Avatar sx={{ width: 36, height: 36, bgcolor: '#fef3c7', color: '#d97706' }}>
+                  <LocationOnIcon fontSize="small" />
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {a.title || (a.invoiceType === 'kurumsal' ? a.companyTitle : `${a.firstName || ''} ${a.lastName || ''}`.trim())}
+                    <Typography component="span" variant="caption" sx={{ ml: 1, color: '#d97706', fontWeight: 600 }}>
+                      {a.invoiceType === 'kurumsal' ? '• Kurumsal' : '• Bireysel'}
+                    </Typography>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{a.address}</Typography>
+                  {a.invoiceType === 'kurumsal' && a.taxNumber && (
+                    <Typography variant="caption" color="text.secondary">VKN: {a.taxNumber} • {a.taxOffice}</Typography>
+                  )}
+                  {a.invoiceType === 'bireysel' && a.tckn && (
+                    <Typography variant="caption" color="text.secondary">TCKN: {a.tckn}</Typography>
+                  )}
+                </Box>
+                <IconButton size="small" onClick={() => openEditBillingDialog(i)} sx={{ color: '#3b82f6' }}><EditIcon fontSize="small" /></IconButton>
+                <IconButton size="small" onClick={() => handleDeleteBilling(i)} sx={{ color: '#dc2626' }}><DeleteIcon fontSize="small" /></IconButton>
+              </Stack>
+            </Box>
+          ))
+        )}
+      </Card>
+
+      <BillingAddressDialog
+        open={billingDialog}
+        onClose={() => setBillingDialog(false)}
+        onSave={handleSaveBilling}
+        editAddress={editBillingAddress}
       />
 
       {/* Order History */}
