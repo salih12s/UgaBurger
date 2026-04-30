@@ -25,35 +25,28 @@ echo.
 echo # Google OAuth
 echo GOOGLE_CLIENT_ID=631573681169-5c6j1gmko7cbrm1uce7uuqo5bi7bkkid.apps.googleusercontent.com
 echo.
-echo # E-Fatura / E-Arsiv Aktif Donusum
+echo # E-Fatura / E-Arsiv Aktif Donusum (CANLI)
 echo EINVOICE_PROVIDER=aktifdonusum
-REM TEST modu: musteri demo edecek, kontor yok, gercek VKN kullanilmiyor.
-REM Canliya gecince:
-REM   EINVOICE_REST_BASE_URL=https://portal.aktifdonusum.com/edonusum
-REM   EINVOICE_SENDER_VKN=0102365158 (gercek VKN)
-REM   EINVOICE_TEST_MODE=false
-REM   EINVOICE_MOCK_MODE / FALLBACK -> kapatilabilir (kontor varsa direkt GIB'e gider)
 echo EINVOICE_API_MODE=rest
-echo EINVOICE_REST_BASE_URL=https://portaltest.aktifdonusum.com/edonusum
+echo EINVOICE_REST_BASE_URL=https://portal.aktifdonusum.com/edonusum
 echo EINVOICE_API_URL=https://service.aktifdonusum.com/InvoiceService/InvoiceWS
 echo EINVOICE_WSDL_URL=https://service.aktifdonusum.com/InvoiceService/InvoiceWS?wsdl
 echo EARCHIVE_API_URL=https://service.aktifdonusum.com/EArchiveInvoiceService/EArchiveInvoiceWS
 echo EARCHIVE_WSDL_URL=https://service.aktifdonusum.com/EArchiveInvoiceService/EArchiveInvoiceWS?wsdl
-echo EINVOICE_USERNAME=admin_008712
-echo EINVOICE_PASSWORD=Ohs^&hi8d
+echo EINVOICE_USERNAME=admin_001742
+echo EINVOICE_PASSWORD=z6GU^&DS4
 echo EINVOICE_PREFIX=AEA
 echo EINVOICE_SOURCE_URN=urn:mail:defaultgb@aktif.com.tr
-REM Demo hesabin REST'ten dogrulanmis TCKN'si.
-echo EINVOICE_SENDER_VKN=29357033844
-echo EINVOICE_SENDER_TITLE=DEMO_AKTF DEMO_AKTF
-echo EINVOICE_SENDER_TAX_OFFICE=Test Vergi Dairesi
-echo EINVOICE_SENDER_ADDRESS=Inonu Mah. 1405 Sk. Murat Apt. No:2 B Yenisehir/Mersin
+echo EINVOICE_SENDER_VKN=0102365158
+echo EINVOICE_SENDER_TITLE=UGA BURGER
+echo EINVOICE_SENDER_TAX_OFFICE=Mersin
+echo EINVOICE_SENDER_ADDRESS=Mersin
 echo EINVOICE_SENDER_CITY=Mersin
 echo EINVOICE_SENDER_DISTRICT=Yenisehir
 echo EINVOICE_SENDER_POSTCODE=33000
 echo EINVOICE_SENDER_EMAIL=info@ugaburger.com
 echo EINVOICE_SENDER_PHONE=+905555555555
-echo EINVOICE_TEST_MODE=true
+echo EINVOICE_TEST_MODE=false
 echo EINVOICE_AUTO_SEND=true
 echo EINVOICE_MOCK_MODE=false
 echo EINVOICE_PREVIEW_EMAIL_FALLBACK=true
