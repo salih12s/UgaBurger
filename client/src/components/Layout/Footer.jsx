@@ -22,18 +22,18 @@ export default function Footer() {
 
   return (
     <>
-      <Box component="footer" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 2, py: 2.5, color: '#888', fontSize: 13, bgcolor: '#fff', borderTop: '1px solid #eee', mt: 5 }}>
-        <Stack direction="row" spacing={2}>
+      <Box component="footer" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 2.5, px: 2, color: '#888', fontSize: 13, bgcolor: '#fff', borderTop: '1px solid #eee', mt: 5, textAlign: 'center' }}>
+        <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', justifyContent: 'center', rowGap: 1, columnGap: 2 }}>
           {legalItems.map(item => (
             settings[item.key] && (
               <Typography key={item.key} variant="caption" onClick={() => setLegalDialog(item)}
-                sx={{ cursor: 'pointer', color: '#3b82f6', '&:hover': { textDecoration: 'underline' } }}>
+                sx={{ cursor: 'pointer', color: '#3b82f6', textAlign: 'center', '&:hover': { textDecoration: 'underline' } }}>
                 {item.label}
               </Typography>
             )
           ))}
         </Stack>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
           © {new Date().getFullYear()} {siteName} - Tüm hakları saklıdır.
         </Typography>
       </Box>

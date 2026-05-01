@@ -189,9 +189,16 @@ export default function OrderManagement() {
   const handleBulkStatusChange = async () => {
     const ordersToUpdate = filteredOrders.filter(o => selectedOrders.includes(o.id) && nextStatus[o.status]);
     if (ordersToUpdate.length === 0) return;
+    // Online ödemesi tamamlanmamış siparişleri filtrele (admin onaylayamaz)
+    const blocked = ordersToUpdate.filter(o => o.order_type === 'online' && o.payment_method === 'online' && o.payment_status !== 'paid');
+    const allowed = ordersToUpdate.filter(o => !(o.order_type === 'online' && o.payment_method === 'online' && o.payment_status !== 'paid'));
+    if (blocked.length > 0) {
+      toast.error(`${blocked.length} sipariş ödeme bekliyor, atlandı`);
+    }
+    if (allowed.length === 0) return;
     try {
-      await Promise.all(ordersToUpdate.map(o => api.put(`/admin/orders/${o.id}/status`, { status: nextStatus[o.status] })));
-      toast.success(`${ordersToUpdate.length} sipariş güncellendi`);
+      await Promise.all(allowed.map(o => api.put(`/admin/orders/${o.id}/status`, { status: nextStatus[o.status] })));
+      toast.success(`${allowed.length} sipariş güncellendi`);
       setSelectedOrders([]);
       fetchOrders();
     } catch { toast.error('Toplu güncelleme hatası'); }
@@ -456,12 +463,24 @@ export default function OrderManagement() {
                 </Stack>
               )}
               <Stack direction="row" spacing={1}>
-                {nextStatus[order.status] && (
-                  <Button size="small" variant="contained" color="success" onClick={() => handleStatusChange(order.id, nextStatus[order.status], order)}
-                    sx={{ fontWeight: 600, fontSize: 12 }}>
-                    {order.status === 'pending' ? '✅ Onayla' : order.status === 'preparing' || order.status === 'confirmed' ? '🚀 Teslim Et' : `→ ${statusLabels[nextStatus[order.status]]}`}
-                  </Button>
-                )}
+                {nextStatus[order.status] && (() => {
+                  // Online sipariş için: müşteri online kart ödemesini
+                  // tamamlamadan (payment_status !== 'paid') admin onaylayamaz.
+                  const awaitingOnlinePayment = order.order_type === 'online'
+                    && order.payment_method === 'online'
+                    && order.payment_status !== 'paid';
+                  return (
+                    <Button size="small" variant="contained" color="success"
+                      disabled={awaitingOnlinePayment}
+                      onClick={() => handleStatusChange(order.id, nextStatus[order.status], order)}
+                      title={awaitingOnlinePayment ? 'Ödeme tamamlanmadan onaylanamaz' : ''}
+                      sx={{ fontWeight: 600, fontSize: 12 }}>
+                      {awaitingOnlinePayment
+                        ? '⏳ Ödeme Bekleniyor'
+                        : order.status === 'pending' ? '✅ Onayla' : order.status === 'preparing' || order.status === 'confirmed' ? '🚀 Teslim Et' : `→ ${statusLabels[nextStatus[order.status]]}`}
+                    </Button>
+                  );
+                })()}
                 {order.status !== 'cancelled' && order.status !== 'delivered' && (
                   <Button size="small" variant="outlined" color="error" onClick={() => setCancelConfirm(order)}
                     sx={{ fontWeight: 600, fontSize: 12 }}>

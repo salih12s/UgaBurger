@@ -50,9 +50,16 @@ const buildInvoiceId = (orderId, date = new Date()) => {
 
 function buildInvoiceXML({ order, invoiceId, uuid, isEarchive }) {
   const { sender, vatRate } = cfg();
-  const now = new Date();
-  const issueDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const issueTime = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  // Türkiye saati (Europe/Istanbul) - sunucu UTC olsa bile faturada doğru saat görünsün
+  const tz = process.env.EINVOICE_TIMEZONE || 'Europe/Istanbul';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date()).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+  const issueDate = `${parts.year}-${parts.month}-${parts.day}`;
+  const issueTime = `${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}:${parts.second}`;
 
   const isKurumsal = order.invoice_type === 'kurumsal';
   const partyIdScheme = isKurumsal ? 'VKN' : 'TCKN';

@@ -1,4 +1,4 @@
-const { Category, Product, Extra, ProductExtra } = require('../models');
+const { Category, Product, Extra, ProductExtra, OptionGroup, OptionGroupItem } = require('../models');
 
 const getCategories = async (req, res) => {
   try {
@@ -9,17 +9,31 @@ const getCategories = async (req, res) => {
   }
 };
 
+const productInclude = [
+  { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
+  { model: Extra, as: 'extras', attributes: ['id', 'name', 'price', 'is_available'], through: { attributes: [] } },
+  {
+    model: OptionGroup,
+    as: 'optionGroups',
+    through: { attributes: [] },
+    where: { is_available: true },
+    required: false,
+    include: [{
+      model: OptionGroupItem,
+      as: 'items',
+      include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }],
+    }],
+  },
+];
+
 const getProducts = async (req, res) => {
   try {
-    const where = { is_available: true };
+    const where = { is_available: true, is_online_sale: true };
     if (req.query.category_id) where.category_id = req.query.category_id;
 
     const products = await Product.findAll({
       where,
-      include: [
-        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
-        { model: Extra, as: 'extras', attributes: ['id', 'name', 'price', 'is_available'], through: { attributes: [] } },
-      ],
+      include: productInclude,
       order: [['sort_order', 'ASC']],
     });
     res.json(products);
@@ -30,12 +44,7 @@ const getProducts = async (req, res) => {
 
 const getProductById = async (req, res) => {
   try {
-    const product = await Product.findByPk(req.params.id, {
-      include: [
-        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
-        { model: Extra, as: 'extras', attributes: ['id', 'name', 'price', 'is_available'], through: { attributes: [] } },
-      ],
-    });
+    const product = await Product.findByPk(req.params.id, { include: productInclude });
     if (!product) return res.status(404).json({ error: 'Ürün bulunamadı' });
     res.json(product);
   } catch (err) {

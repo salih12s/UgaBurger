@@ -27,6 +27,8 @@ export default function TableOrders() {
   // Extras dialog
   const [extrasDialog, setExtrasDialog] = useState(null);
   const [selectedExtras, setSelectedExtras] = useState([]);
+  // groupId -> [{id,name,price,quantity}]
+  const [selectedOptions, setSelectedOptions] = useState({});
 
   useEffect(() => {
     fetchTables();
@@ -38,9 +40,12 @@ export default function TableOrders() {
   const fetchTables = () => api.get('/admin/tables').then(res => setTables(res.data));
 
   const handleProductClick = (product) => {
-    if (product.extras && product.extras.length > 0) {
+    const hasExtras = product.extras && product.extras.length > 0;
+    const hasOptions = product.optionGroups && product.optionGroups.length > 0;
+    if (hasExtras || hasOptions) {
       setExtrasDialog(product);
       setSelectedExtras([]);
+      setSelectedOptions({});
     } else {
       addToCart(product, []);
     }
@@ -64,11 +69,41 @@ export default function TableOrders() {
     }));
   };
 
+  const toggleOptionItem = (group, item) => {
+    const entry = {
+      id: `og_${item.id}`,
+      name: item.product?.name || 'Seçim',
+      price: parseFloat(item.additional_price) || 0,
+      quantity: 1,
+    };
+    setSelectedOptions(prev => {
+      const cur = prev[group.id] || [];
+      const exists = cur.find(c => c.id === entry.id);
+      let next;
+      if (exists) next = cur.filter(c => c.id !== entry.id);
+      else if (group.multi_select) {
+        if (cur.length >= (group.max_select || 99)) return prev;
+        next = [...cur, entry];
+      } else next = [entry];
+      return { ...prev, [group.id]: next };
+    });
+  };
+
   const confirmExtras = () => {
     if (extrasDialog) {
-      addToCart(extrasDialog, selectedExtras);
+      const groups = extrasDialog.optionGroups || [];
+      for (const g of groups) {
+        const cnt = (selectedOptions[g.id] || []).length;
+        if (cnt < (g.min_select || 0)) {
+          toast.error(`"${g.name}" için en az ${g.min_select} seçim yapın`);
+          return;
+        }
+      }
+      const allOpts = Object.values(selectedOptions).flat();
+      addToCart(extrasDialog, [...selectedExtras, ...allOpts]);
       setExtrasDialog(null);
       setSelectedExtras([]);
+      setSelectedOptions({});
     }
   };
 
@@ -229,7 +264,7 @@ export default function TableOrders() {
     } catch (err) { toast.error(err.response?.data?.error || 'Hata'); }
   };
 
-  const filteredProducts = activeCategory ? products.filter(p => p.category_id === activeCategory) : products;
+  const filteredProducts = (activeCategory ? products.filter(p => p.category_id === activeCategory) : products).filter(p => p.is_quick_order !== false);
 
   return (
     <Box sx={{ overflow: 'hidden' }}>
@@ -370,9 +405,37 @@ export default function TableOrders() {
       </Box>
 
       <Dialog open={!!extrasDialog} onClose={() => setExtrasDialog(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>{extrasDialog?.name} - Ekstra Seç</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{extrasDialog?.name}</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>İstediğiniz ekstraları seçin:</Typography>
+          {(extrasDialog?.optionGroups || []).map(group => {
+            const sel = selectedOptions[group.id] || [];
+            return (
+              <Box key={group.id} sx={{ mb: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{group.name}</Typography>
+                  <Chip size="small" label={`${group.min_select}-${group.max_select}`} sx={{ height: 20, fontSize: 10, bgcolor: '#fef3c7', color: '#92400e' }} />
+                </Stack>
+                <Stack spacing={0.75}>
+                  {(group.items || []).map(item => {
+                    const isSel = !!sel.find(c => c.id === `og_${item.id}`);
+                    const addPrice = parseFloat(item.additional_price) || 0;
+                    return (
+                      <Chip key={item.id}
+                        label={`${item.product?.name || 'Ürün'}${addPrice > 0 ? ` (+${addPrice.toFixed(2)} TL)` : ''}`}
+                        onClick={() => toggleOptionItem(group, item)}
+                        variant={isSel ? 'filled' : 'outlined'}
+                        sx={{ fontWeight: 600, justifyContent: 'flex-start', height: 36, ...(isSel && { bgcolor: '#dc2626', color: '#fff' }) }}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Box>
+            );
+          })}
+
+          {(extrasDialog?.extras || []).filter(e => e.is_available !== false).length > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>Ekstralar:</Typography>
+          )}
           <Stack spacing={1}>
             {extrasDialog?.extras?.filter(e => e.is_available !== false).map(extra => {
               const selected = selectedExtras.find(e => e.id === extra.id);
@@ -406,10 +469,8 @@ export default function TableOrders() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => { addToCart(extrasDialog, []); setExtrasDialog(null); }} sx={{ fontWeight: 600 }}>Ekstrasız Ekle</Button>
-          <Button variant="contained" onClick={confirmExtras} sx={{ fontWeight: 600 }}>
-            {selectedExtras.length > 0 ? `Seçilenlerle Ekle (${selectedExtras.reduce((s, e) => s + (e.quantity || 1), 0)})` : 'Ekle'}
-          </Button>
+          <Button onClick={() => { addToCart(extrasDialog, []); setExtrasDialog(null); setSelectedOptions({}); setSelectedExtras([]); }} sx={{ fontWeight: 600 }}>Boş Ekle</Button>
+          <Button variant="contained" onClick={confirmExtras} sx={{ fontWeight: 600 }}>Seçilenlerle Ekle</Button>
         </DialogActions>
       </Dialog>
     </Box>

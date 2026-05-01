@@ -2,19 +2,24 @@ import { useState } from 'react';
 import { useCart } from '../../context/CartContext';
 import toast from 'react-hot-toast';
 import {
-  Dialog, DialogContent, Box, Typography, Chip, IconButton, Button, Checkbox, Stack
+  Dialog, DialogContent, Box, Typography, Chip, IconButton, Button, Checkbox, Stack,
+  Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getImageUrl } from '../../api/api';
 
 export default function ProductModal({ product, onClose }) {
   const [quantity, setQuantity] = useState(1);
   const [selectedExtras, setSelectedExtras] = useState([]);
+  // optionGroupId -> [{ id, name, price, quantity }]
+  const [selectedOptions, setSelectedOptions] = useState({});
   const { addItem } = useCart();
 
   const extras = product.extras || [];
+  const optionGroups = product.optionGroups || [];
 
   const toggleExtra = (extra) => {
     setSelectedExtras(prev =>
@@ -30,11 +35,48 @@ export default function ProductModal({ product, onClose }) {
     }));
   };
 
+  const toggleOption = (group, item) => {
+    const itemEntry = {
+      id: `og_${item.id}`,
+      name: item.product?.name || 'Seçim',
+      price: parseFloat(item.additional_price) || 0,
+      quantity: 1,
+      _option_group_id: group.id,
+      _option_group_name: group.name,
+    };
+    setSelectedOptions(prev => {
+      const current = prev[group.id] || [];
+      const exists = current.find(c => c.id === itemEntry.id);
+      let next;
+      if (exists) {
+        next = current.filter(c => c.id !== itemEntry.id);
+      } else if (group.multi_select) {
+        if (current.length >= (group.max_select || 99)) return prev;
+        next = [...current, itemEntry];
+      } else {
+        next = [itemEntry];
+      }
+      return { ...prev, [group.id]: next };
+    });
+  };
+
+  const allOptionSelections = Object.values(selectedOptions).flat();
+  const optionsTotal = allOptionSelections.reduce((s, e) => s + parseFloat(e.price) * (e.quantity || 1), 0);
   const extrasTotal = selectedExtras.reduce((s, e) => s + parseFloat(e.price) * (e.quantity || 1), 0);
-  const totalPrice = (parseFloat(product.price) + extrasTotal) * quantity;
+  const totalPrice = (parseFloat(product.price) + extrasTotal + optionsTotal) * quantity;
 
   const handleAdd = () => {
-    addItem(product, quantity, selectedExtras);
+    // Min seçim doğrulaması
+    for (const g of optionGroups) {
+      const count = (selectedOptions[g.id] || []).length;
+      const min = g.min_select || 0;
+      if (count < min) {
+        toast.error(`"${g.name}" için en az ${min} seçim yapmalısınız`);
+        return;
+      }
+    }
+    // Opsiyon seçimlerini de extras gibi gönder
+    addItem(product, quantity, [...selectedExtras, ...allOptionSelections]);
     toast.success(`${product.name} sepete eklendi`);
     onClose();
   };
@@ -64,12 +106,74 @@ export default function ProductModal({ product, onClose }) {
         )}
 
         <Box>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Ekstra Lezzetler</Typography>
-            <Chip label="İsteğe Bağlı" size="small" sx={{ fontSize: 11, bgcolor: '#f0f0f0', color: '#888' }} />
-          </Stack>
+          {optionGroups.map(group => {
+            const selectedList = selectedOptions[group.id] || [];
+            const isComplete = selectedList.length >= (group.min_select || 0);
+            const summary = selectedList.map(s => s.name).join(', ');
+            return (
+              <Accordion key={group.id} disableGutters elevation={0} defaultExpanded
+                sx={{
+                  mb: 1.25, borderRadius: 2, border: '1px solid',
+                  borderColor: !isComplete && group.min_select > 0 ? '#fca5a5' : '#e5e7eb',
+                  '&:before': { display: 'none' },
+                  '&.Mui-expanded': { my: 1.25 },
+                  overflow: 'hidden',
+                }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 56, '& .MuiAccordionSummary-content': { my: 1 } }}>
+                  <Stack sx={{ flex: 1 }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="body1" sx={{ fontWeight: 700 }}>{group.name}</Typography>
+                      {group.min_select > 0 && (
+                        <Chip size="small" label="Zorunlu" sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#fee2e2', color: '#dc2626' }} />
+                      )}
+                      <Chip size="small" label={`${group.min_select}-${group.max_select}`} sx={{ height: 18, fontSize: 10, bgcolor: '#f3f4f6', color: '#6b7280' }} />
+                    </Stack>
+                    {summary && (
+                      <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 600, mt: 0.25 }}>
+                        Seçim: {summary}
+                      </Typography>
+                    )}
+                  </Stack>
+                </AccordionSummary>
+                <AccordionDetails sx={{ pt: 0, pb: 1.5 }}>
+                  {(group.items || []).map(item => {
+                    const isSelected = !!selectedList.find(s => s.id === `og_${item.id}`);
+                    const addPrice = parseFloat(item.additional_price) || 0;
+                    return (
+                      <Box key={item.id}
+                        onClick={() => toggleOption(group, item)}
+                        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25,
+                          border: 1, borderColor: isSelected ? '#dc2626' : '#eee', borderRadius: 2, mt: 1, cursor: 'pointer',
+                          bgcolor: isSelected ? '#fef2f2' : 'transparent', transition: 'all 0.15s' }}>
+                        <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+                          <Checkbox checked={isSelected} size="small" sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
+                          {item.product?.image_url
+                            ? <Box component="img" src={getImageUrl(item.product.image_url)} alt="" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover', flexShrink: 0 }} />
+                            : <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🍔</Box>
+                          }
+                          <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.product?.name || 'Ürün'}</Typography>
+                        </Stack>
+                        {addPrice > 0 && (
+                          <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 700, whiteSpace: 'nowrap', ml: 1 }}>+{addPrice.toFixed(2)} ₺</Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </AccordionDetails>
+              </Accordion>
+            );
+          })}
 
-          {extras.length === 0 ? (
+          {extras.length > 0 && (
+            <>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 2, mb: 0.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Ekstra Lezzetler</Typography>
+                <Chip label="İsteğe Bağlı" size="small" sx={{ fontSize: 11, bgcolor: '#f0f0f0', color: '#888' }} />
+              </Stack>
+            </>
+          )}
+
+          {extras.length === 0 && optionGroups.length === 0 ? (
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f8f8f8', borderRadius: 2, mt: 1 }}>
               <Typography variant="body2" color="text.secondary">Bu ürün için ekstra seçenek bulunmuyor.</Typography>
             </Box>

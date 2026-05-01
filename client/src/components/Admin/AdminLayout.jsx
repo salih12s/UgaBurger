@@ -37,6 +37,7 @@ export default function AdminLayout() {
   const [activeTab, setActiveTab] = useState('orders');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingOnlineCount, setPendingOnlineCount] = useState(0);
   const [seenCount, setSeenCount] = useState(0);
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -52,11 +53,13 @@ export default function AdminLayout() {
     const fetchPending = async () => {
       try {
         const res = await api.get('/admin/orders');
-        const count = res.data.filter(o => o.status === 'pending').length;
+        const pendingList = res.data.filter(o => o.status === 'pending');
+        const count = pendingList.length;
+        const onlineCount = pendingList.filter(o => o.order_type === 'online').length;
         pendingRef.current = count;
-        // Eğer kullanıcı şu an Siparişler sekmesinde ise otomatik olarak görülmüş say
         if (activeTab === 'orders') seenRef.current = count;
         setPendingCount(count);
+        setPendingOnlineCount(onlineCount);
       } catch { /* sessiz geç */ }
     };
     fetchPending();
@@ -90,6 +93,18 @@ export default function AdminLayout() {
               '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' } }}>
             <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>{tab.icon}</ListItemIcon>
             <ListItemText primary={tab.label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }} />
+            {tab.id === 'orders' && pendingOnlineCount > 0 && (
+              <Box sx={{
+                width: 10, height: 10, borderRadius: '50%', bgcolor: '#dc2626',
+                mr: 1, boxShadow: '0 0 0 0 rgba(220,38,38,0.7)',
+                animation: 'pulseDot 1.6s infinite',
+                '@keyframes pulseDot': {
+                  '0%': { boxShadow: '0 0 0 0 rgba(220,38,38,0.7)' },
+                  '70%': { boxShadow: '0 0 0 8px rgba(220,38,38,0)' },
+                  '100%': { boxShadow: '0 0 0 0 rgba(220,38,38,0)' },
+                },
+              }} />
+            )}
             {tab.id === 'orders' && unseenPending > 0 && (
               <Badge badgeContent={unseenPending} color="error"
                 sx={{ mr: 1.5, '& .MuiBadge-badge': { bgcolor: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 11, minWidth: 20, height: 20 } }} />

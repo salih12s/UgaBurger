@@ -28,12 +28,12 @@ async function autoSendInvoiceForOrder(order) {
     //            yoksa -> 'draft'
     //  - diger : 'failed'
     // Eger ana akis 'failed' dondu ama fallback aktifse, draft preview email'i son care olarak deneyelim.
-    const fallbackEnabled = String(process.env.EINVOICE_PREVIEW_EMAIL_FALLBACK || 'true').toLowerCase() === 'true';
+    const fallbackEnabled = String(process.env.EINVOICE_PREVIEW_EMAIL_FALLBACK || 'false').toLowerCase() === 'true';
     if (result.status === 'failed' && fallbackEnabled && order.billing_email) {
       try {
         const svc = require('./einvoiceService');
         if (typeof svc.sendDraftPreviewByEmail === 'function') {
-          const mail = await svc.sendDraftPreviewByEmail(order, { addDraftWatermark: true });
+          const mail = await svc.sendDraftPreviewByEmail(order, { addDraftWatermark: false });
           result.mail = mail;
           if (mail && mail.status === 'sent') {
             result.status = 'draft';

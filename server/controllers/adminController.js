@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
-const { Order, OrderItem, Product, User, Table, Category, Extra, ProductExtra, Setting, PromoCode } = require('../models');
+const { Order, OrderItem, Product, User, Table, Category, Extra, ProductExtra, Setting, PromoCode, OptionGroup, OptionGroupItem, ProductOptionGroup } = require('../models');
 const { refundPaytrPayment, capturePaytrPayment } = require('./paytrController');
 const multer = require('multer');
 const path = require('path');
@@ -34,6 +34,18 @@ const updateOrderStatus = async (req, res) => {
 
     const { status, table_id } = req.body;
     const prevStatus = order.status;
+
+    // Online sipariş + online ödeme + henüz 'paid' değilse onay/preparing/ready/delivered/confirmed
+    // statüsüne geçmesine izin verme. (PayTR akışında müşteri ödemeyi tamamlayınca paytr callback
+    // payment_status='paid' yapar.) İptal her zaman serbest.
+    const advanceStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+    if (status && advanceStatuses.includes(status)
+        && order.order_type === 'online'
+        && order.payment_method === 'online'
+        && order.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'Müşteri online ödemeyi tamamlamadan sipariş onaylanamaz.' });
+    }
+
     if (status) order.status = status;
     if (table_id !== undefined) order.table_id = table_id || null;
 
@@ -238,23 +250,46 @@ const getAllProductsAdmin = async (req, res) => {
       include: [
         { model: Category, as: 'category', attributes: ['id', 'name'] },
         { model: Extra, as: 'extras', through: { attributes: [] } },
+        {
+          model: OptionGroup,
+          as: 'optionGroups',
+          through: { attributes: [] },
+          include: [{ model: OptionGroupItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }] }],
+        },
       ],
       order: [['category_id', 'ASC'], ['sort_order', 'ASC']],
     });
     res.json(products);
-  } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
 };
 
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, category_id, image_url, is_available, sort_order, extra_ids } = req.body;
-    const product = await Product.create({ name, description, price, category_id, image_url: image_url || '', is_available: is_available !== false, sort_order: sort_order || 0 });
+    const { name, description, price, category_id, image_url, is_available, is_suggested, is_online_sale, is_quick_order, sort_order, extra_ids, option_group_ids } = req.body;
+    const product = await Product.create({
+      name, description, price, category_id,
+      image_url: image_url || '',
+      is_available: is_available !== false,
+      is_suggested: !!is_suggested,
+      is_online_sale: is_online_sale !== false,
+      is_quick_order: is_quick_order !== false,
+      sort_order: sort_order || 0,
+    });
 
     if (extra_ids && extra_ids.length > 0) {
       for (const eid of extra_ids) { await ProductExtra.create({ product_id: product.id, extra_id: eid }); }
     }
+    if (option_group_ids && option_group_ids.length > 0) {
+      for (const ogid of option_group_ids) { await ProductOptionGroup.create({ product_id: product.id, option_group_id: ogid }); }
+    }
 
-    const full = await Product.findByPk(product.id, { include: [{ model: Category, as: 'category' }, { model: Extra, as: 'extras', through: { attributes: [] } }] });
+    const full = await Product.findByPk(product.id, {
+      include: [
+        { model: Category, as: 'category' },
+        { model: Extra, as: 'extras', through: { attributes: [] } },
+        { model: OptionGroup, as: 'optionGroups', through: { attributes: [] } },
+      ],
+    });
     res.status(201).json(full);
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
 };
@@ -264,15 +299,29 @@ const updateProduct = async (req, res) => {
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ error: 'Ürün bulunamadı' });
 
-    const { name, description, price, category_id, image_url, is_available, sort_order, extra_ids } = req.body;
-    await product.update({ name, description, price, category_id, image_url, is_available, sort_order });
+    const { name, description, price, category_id, image_url, is_available, is_suggested, is_online_sale, is_quick_order, sort_order, extra_ids, option_group_ids } = req.body;
+    const patch = { name, description, price, category_id, image_url, is_available, sort_order };
+    if (is_suggested !== undefined) patch.is_suggested = !!is_suggested;
+    if (is_online_sale !== undefined) patch.is_online_sale = !!is_online_sale;
+    if (is_quick_order !== undefined) patch.is_quick_order = !!is_quick_order;
+    await product.update(patch);
 
     if (extra_ids !== undefined) {
       await ProductExtra.destroy({ where: { product_id: product.id } });
       for (const eid of extra_ids) { await ProductExtra.create({ product_id: product.id, extra_id: eid }); }
     }
+    if (option_group_ids !== undefined) {
+      await ProductOptionGroup.destroy({ where: { product_id: product.id } });
+      for (const ogid of option_group_ids) { await ProductOptionGroup.create({ product_id: product.id, option_group_id: ogid }); }
+    }
 
-    const full = await Product.findByPk(product.id, { include: [{ model: Category, as: 'category' }, { model: Extra, as: 'extras', through: { attributes: [] } }] });
+    const full = await Product.findByPk(product.id, {
+      include: [
+        { model: Category, as: 'category' },
+        { model: Extra, as: 'extras', through: { attributes: [] } },
+        { model: OptionGroup, as: 'optionGroups', through: { attributes: [] } },
+      ],
+    });
     res.json(full);
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
 };
@@ -282,6 +331,8 @@ const deleteProduct = async (req, res) => {
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ error: 'Ürün bulunamadı' });
     await ProductExtra.destroy({ where: { product_id: product.id } });
+    await ProductOptionGroup.destroy({ where: { product_id: product.id } });
+    await OptionGroupItem.destroy({ where: { product_id: product.id } });
     await product.destroy();
     res.json({ message: 'Ürün silindi' });
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
@@ -572,6 +623,103 @@ const deletePromoCode = async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası' }); }
 };
 
+// --- OPTION GROUPS (Opsiyonlar) ---
+const includeFullOptionGroup = [
+  {
+    model: OptionGroupItem,
+    as: 'items',
+    include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }],
+  },
+];
+
+const getOptionGroups = async (req, res) => {
+  try {
+    const groups = await OptionGroup.findAll({
+      include: [
+        ...includeFullOptionGroup,
+        { model: Product, as: 'attachedProducts', attributes: ['id', 'name'], through: { attributes: [] } },
+      ],
+      order: [['sort_order', 'ASC'], ['id', 'ASC']],
+    });
+    res.json(groups);
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
+};
+
+const _saveOptionGroupItems = async (groupId, items = []) => {
+  await OptionGroupItem.destroy({ where: { option_group_id: groupId } });
+  let i = 0;
+  for (const it of items) {
+    if (!it || !it.product_id) continue;
+    await OptionGroupItem.create({
+      option_group_id: groupId,
+      product_id: parseInt(it.product_id),
+      additional_price: parseFloat(it.additional_price) || 0,
+      sort_order: i++,
+    });
+  }
+};
+
+const _saveOptionGroupAttached = async (groupId, productIds = []) => {
+  await ProductOptionGroup.destroy({ where: { option_group_id: groupId } });
+  for (const pid of productIds) {
+    if (!pid) continue;
+    await ProductOptionGroup.create({ option_group_id: groupId, product_id: parseInt(pid) });
+  }
+};
+
+const createOptionGroup = async (req, res) => {
+  try {
+    const { name, multi_select, min_select, max_select, is_available, sort_order, items, attached_product_ids } = req.body;
+    if (!name) return res.status(400).json({ error: 'Opsiyon adı zorunlu' });
+    const group = await OptionGroup.create({
+      name,
+      multi_select: !!multi_select,
+      min_select: parseInt(min_select) || 1,
+      max_select: parseInt(max_select) || 1,
+      is_available: is_available !== false,
+      sort_order: sort_order || 0,
+    });
+    if (Array.isArray(items)) await _saveOptionGroupItems(group.id, items);
+    if (Array.isArray(attached_product_ids)) await _saveOptionGroupAttached(group.id, attached_product_ids);
+
+    const full = await OptionGroup.findByPk(group.id, { include: includeFullOptionGroup });
+    res.status(201).json(full);
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
+};
+
+const updateOptionGroup = async (req, res) => {
+  try {
+    const group = await OptionGroup.findByPk(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Opsiyon grubu bulunamadı' });
+    const { name, multi_select, min_select, max_select, is_available, sort_order, items, attached_product_ids } = req.body;
+    const patch = {};
+    if (name !== undefined) patch.name = name;
+    if (multi_select !== undefined) patch.multi_select = !!multi_select;
+    if (min_select !== undefined) patch.min_select = parseInt(min_select) || 1;
+    if (max_select !== undefined) patch.max_select = parseInt(max_select) || 1;
+    if (is_available !== undefined) patch.is_available = !!is_available;
+    if (sort_order !== undefined) patch.sort_order = sort_order;
+    await group.update(patch);
+
+    if (Array.isArray(items)) await _saveOptionGroupItems(group.id, items);
+    if (Array.isArray(attached_product_ids)) await _saveOptionGroupAttached(group.id, attached_product_ids);
+
+    const full = await OptionGroup.findByPk(group.id, { include: includeFullOptionGroup });
+    res.json(full);
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
+};
+
+const deleteOptionGroup = async (req, res) => {
+  try {
+    const group = await OptionGroup.findByPk(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Opsiyon grubu bulunamadı' });
+    await OptionGroupItem.destroy({ where: { option_group_id: group.id } });
+    await ProductOptionGroup.destroy({ where: { option_group_id: group.id } });
+    await group.destroy();
+    res.json({ message: 'Opsiyon grubu silindi' });
+  } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
+};
+
 module.exports = {
   getAllOrders, updateOrderStatus, createQuickOrder,
   getTables, createTable, updateTable, deleteTable,
@@ -583,4 +731,5 @@ module.exports = {
   getAllUsers,
   getSettings, updateSetting,
   getPromoCodes, createPromoCode, updatePromoCode, deletePromoCode,
+  getOptionGroups, createOptionGroup, updateOptionGroup, deleteOptionGroup,
 };

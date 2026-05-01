@@ -63,6 +63,12 @@ router.post('/promo-codes', ctrl.createPromoCode);
 router.put('/promo-codes/:id', ctrl.updatePromoCode);
 router.delete('/promo-codes/:id', ctrl.deletePromoCode);
 
+// Option Groups (Opsiyonlar)
+router.get('/option-groups', ctrl.getOptionGroups);
+router.post('/option-groups', ctrl.createOptionGroup);
+router.put('/option-groups/:id', ctrl.updateOptionGroup);
+router.delete('/option-groups/:id', ctrl.deleteOptionGroup);
+
 // E-Fatura / E-Arsiv
 const einvoiceCtrl = require('../controllers/einvoiceController');
 router.post('/einvoice/orders/:id/send', einvoiceCtrl.sendForOrder);

@@ -344,12 +344,13 @@ async function sendInvoiceForOrder(order) {
 
   // Taslak yuklendi ama gonderim basarisiz (cogunlukla kontor sorunu).
   // Fallback: resmi sablonda PDF onizlemesi alip musterinin mailine ekleyelim.
-  // Boylece kontorsuz demo/test akisinda da musteri faturasini gorebilir.
-  const fallbackEmail = String(process.env.EINVOICE_PREVIEW_EMAIL_FALLBACK || 'true').toLowerCase() === 'true';
+  // NOT: Bu onizleme PDF'i GIB tarafinda "TASLAK" filigrani ile dondurulur,
+  // bu yuzden varsayilan olarak KAPALI; sadece EINVOICE_PREVIEW_EMAIL_FALLBACK=true ise calisir.
+  const fallbackEmail = String(process.env.EINVOICE_PREVIEW_EMAIL_FALLBACK || 'false').toLowerCase() === 'true';
   let mailInfo = null;
   if (fallbackEmail && order.billing_email) {
     try {
-      const m = await sendDraftPreviewByEmail(order, { addDraftWatermark: true });
+      const m = await sendDraftPreviewByEmail(order, { addDraftWatermark: false });
       mailInfo = m;
     } catch (e) {
       mailInfo = { status: 'failed', error: 'Mail gonderim hatasi: ' + e.message };
@@ -383,7 +384,7 @@ async function queryLoadDocument({ documentType = 'EARSIVFATURA', uuid }) {
  * @param {boolean} [opts.addDraftWatermark] - "TASLAK" filigrani ekle
  * @returns {Promise<{ok:boolean, content:Buffer|null, contentBase64:string|null, message:string|null, raw:any}>}
  */
-async function getDraftPreview({ xml, documentType = 'EARSIVFATURA', previewType = 'PDF', addDraftWatermark = true }) {
+async function getDraftPreview({ xml, documentType = 'EARSIVFATURA', previewType = 'PDF', addDraftWatermark = false }) {
   if (!xml) return { ok: false, content: null, contentBase64: null, message: 'xml bos olamaz', raw: null };
   const xmlBase64 = Buffer.from(xml, 'utf8').toString('base64');
   // ReDoc/Swagger spec'inde GET olarak tanimlanmis; body ile birlikte gonderiyoruz.
@@ -412,7 +413,7 @@ async function getDraftPreview({ xml, documentType = 'EARSIVFATURA', previewType
  * Order'dan UBL XML uretir ve resmi sablonda PDF/HTML onizleme dondurur.
  * Kontor harcamaz; demo/test/yedek senaryolarda kullanilabilir.
  */
-async function getDraftPreviewForOrder(order, { previewType = 'PDF', addDraftWatermark = true } = {}) {
+async function getDraftPreviewForOrder(order, { previewType = 'PDF', addDraftWatermark = false } = {}) {
   const c = cfg();
   const uuid = uuidv4();
   const invoiceId = buildInvoiceId(order.id);
@@ -428,7 +429,7 @@ async function getDraftPreviewForOrder(order, { previewType = 'PDF', addDraftWat
  * Resmi sablondaki PDF/HTML'i musterinin e-postasina gonderir.
  * GIB'e iletmez, kontor harcamaz - demo/test akisi icindir.
  */
-async function sendDraftPreviewByEmail(order, { addDraftWatermark = true } = {}) {
+async function sendDraftPreviewByEmail(order, { addDraftWatermark = false } = {}) {
   const email = order.billing_email;
   if (!email) {
     return { status: 'failed', error: 'Musterinin billing_email alani bos.', preview: false };
@@ -450,8 +451,7 @@ async function sendDraftPreviewByEmail(order, { addDraftWatermark = true } = {})
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 
-  const watermarkLabel = addDraftWatermark ? ' [TASLAK / DEMO]' : '';
-  const subject = `${pdf.isEarchive ? 'E-Arsiv' : 'E-Fatura'} Faturaniz - ${pdf.invoiceId}${watermarkLabel}`;
+  const subject = `${pdf.isEarchive ? 'E-Arsiv' : 'E-Fatura'} Faturaniz - ${pdf.invoiceId}`;
   const bodyHtml = (html.ok && html.content)
     ? html.content.toString('utf8')
     : `<p>Sayin musterimiz,</p><p>Fatura PDF'iniz ekte yer almaktadir.</p>`;

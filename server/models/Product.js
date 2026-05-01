@@ -13,6 +13,10 @@ const Product = sequelize.define('Product', {
   image_url: { type: DataTypes.TEXT('long'), defaultValue: '' },
   is_available: { type: DataTypes.BOOLEAN, defaultValue: true },
   is_suggested: { type: DataTypes.BOOLEAN, defaultValue: false },
+  // Online satış ekranında (müşteriye dönük menü) gösterilsin mi
+  is_online_sale: { type: DataTypes.BOOLEAN, defaultValue: true },
+  // Hızlı sipariş / POS ekranında gösterilsin mi
+  is_quick_order: { type: DataTypes.BOOLEAN, defaultValue: true },
   sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },
 }, { tableName: 'products' });
 

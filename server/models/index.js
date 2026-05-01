@@ -9,6 +9,9 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Setting = require('./Setting');
 const PromoCode = require('./PromoCode');
+const OptionGroup = require('./OptionGroup');
+const OptionGroupItem = require('./OptionGroupItem');
+const ProductOptionGroup = require('./ProductOptionGroup');
 
 // Category <-> Product
 Category.hasMany(Product, { foreignKey: 'category_id', as: 'products' });
@@ -34,6 +37,18 @@ OrderItem.belongsTo(Order, { foreignKey: 'order_id', as: 'order' });
 Product.hasMany(OrderItem, { foreignKey: 'product_id', as: 'orderItems' });
 OrderItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 
+// OptionGroup <-> OptionGroupItem (1-N)
+OptionGroup.hasMany(OptionGroupItem, { foreignKey: 'option_group_id', as: 'items', onDelete: 'CASCADE' });
+OptionGroupItem.belongsTo(OptionGroup, { foreignKey: 'option_group_id', as: 'group' });
+
+// OptionGroupItem -> Product (her item bir ürünü temsil eder)
+OptionGroupItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(OptionGroupItem, { foreignKey: 'product_id', as: 'optionGroupItems' });
+
+// Product <-> OptionGroup (M-N: bir ürünün birden fazla opsiyon grubu olabilir)
+Product.belongsToMany(OptionGroup, { through: ProductOptionGroup, foreignKey: 'product_id', otherKey: 'option_group_id', as: 'optionGroups' });
+OptionGroup.belongsToMany(Product, { through: ProductOptionGroup, foreignKey: 'option_group_id', otherKey: 'product_id', as: 'attachedProducts' });
+
 module.exports = {
   sequelize,
   User,
@@ -46,4 +61,7 @@ module.exports = {
   OrderItem,
   Setting,
   PromoCode,
+  OptionGroup,
+  OptionGroupItem,
+  ProductOptionGroup,
 };
