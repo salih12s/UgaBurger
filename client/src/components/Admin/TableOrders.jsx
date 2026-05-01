@@ -469,7 +469,9 @@ export default function TableOrders() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => { addToCart(extrasDialog, []); setExtrasDialog(null); setSelectedOptions({}); setSelectedExtras([]); }} sx={{ fontWeight: 600 }}>Boş Ekle</Button>
+          {(!extrasDialog?.optionGroups || extrasDialog.optionGroups.length === 0) && (
+            <Button onClick={() => { addToCart(extrasDialog, []); setExtrasDialog(null); setSelectedOptions({}); setSelectedExtras([]); }} sx={{ fontWeight: 600 }}>Boş Ekle</Button>
+          )}
           <Button variant="contained" onClick={confirmExtras} sx={{ fontWeight: 600 }}>Seçilenlerle Ekle</Button>
         </DialogActions>
       </Dialog>

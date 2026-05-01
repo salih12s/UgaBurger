@@ -34,7 +34,10 @@ const getProducts = async (req, res) => {
     const products = await Product.findAll({
       where,
       include: productInclude,
-      order: [['sort_order', 'ASC']],
+      order: [
+        ['sort_order', 'ASC'],
+        [{ model: OptionGroup, as: 'optionGroups' }, 'sort_order', 'ASC'],
+      ],
     });
     res.json(products);
   } catch (err) {

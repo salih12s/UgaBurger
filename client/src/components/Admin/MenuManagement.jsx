@@ -10,6 +10,8 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 export default function MenuManagement() {
   const [products, setProducts] = useState([]);
@@ -27,7 +29,7 @@ export default function MenuManagement() {
   const [optionForm, setOptionForm] = useState({ name: '', multi_select: false, min_select: 1, max_select: 1, is_available: true, items: [], attached_product_ids: [] });
   // "Opsiyonlu Menü" modu: opsiyon grubu oluştururken aynı zamanda otomatik bir menü ürünü de yaratılır
   const [menuMode, setMenuMode] = useState(false);
-  const [menuMeta, setMenuMeta] = useState({ price: '', category_id: '', image_url: '', description: '' });
+  const [menuMeta, setMenuMeta] = useState({ price: '', category_id: '', image_url: '', description: '', is_online_sale: true, is_quick_order: true, is_available: true });
   // Menü düzenleme bölümleri: her bölüm = 1 OptionGroup (kategoriye göre)
   const [menuSections, setMenuSections] = useState([]);
   // Menü düzenlemede mevcut ama arık kullanılmayan opsiyon gruplarını silmek için
@@ -107,7 +109,7 @@ export default function MenuManagement() {
   const openNewOption = () => {
     setEditingOption(null);
     setMenuMode(false);
-    setMenuMeta({ price: '', category_id: '', image_url: '', description: '' });
+    setMenuMeta({ price: '', category_id: '', image_url: '', description: '', is_online_sale: true, is_quick_order: true, is_available: true });
     setOptionForm({ name: '', multi_select: false, min_select: 1, max_select: 1, is_available: true, items: [], attached_product_ids: [] });
     setShowOptionForm(true);
   };
@@ -117,7 +119,7 @@ export default function MenuManagement() {
     setEditingMenuProductId(null);
     setOriginalGroupIds([]);
     setMenuMode(true);
-    setMenuMeta({ price: '', category_id: categories[0]?.id || '', image_url: '', description: '' });
+    setMenuMeta({ price: '', category_id: categories[0]?.id || '', image_url: '', description: '', is_online_sale: true, is_quick_order: true, is_available: true });
     setOptionForm({ name: '', multi_select: false, min_select: 1, max_select: 1, is_available: true, items: [], attached_product_ids: [] });
     setMenuSections([]);
     setShowOptionForm(true);
@@ -133,6 +135,9 @@ export default function MenuManagement() {
       category_id: p.category_id,
       image_url: p.image_url || '',
       description: p.description || '',
+      is_online_sale: p.is_online_sale !== false,
+      is_quick_order: p.is_quick_order !== false,
+      is_available: p.is_available !== false,
     });
     setOptionForm({ name: p.name, multi_select: false, min_select: 1, max_select: 1, is_available: true, items: [], attached_product_ids: [] });
     const sections = (p.optionGroups || []).map(g => {
@@ -161,6 +166,15 @@ export default function MenuManagement() {
   };
   const removeMenuSection = (idx) => {
     setMenuSections(s => s.filter((_, i) => i !== idx));
+  };
+  const moveMenuSection = (idx, dir) => {
+    setMenuSections(s => {
+      const next = [...s];
+      const j = idx + dir;
+      if (j < 0 || j >= next.length) return s;
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
   };
   const updateMenuSection = (idx, patch) => {
     setMenuSections(s => s.map((sec, i) => i === idx ? { ...sec, ...patch } : sec));
@@ -239,9 +253,9 @@ export default function MenuManagement() {
           price: parseFloat(menuMeta.price) || 0,
           category_id: parseInt(menuMeta.category_id),
           image_url: menuMeta.image_url || '',
-          is_available: true,
-          is_online_sale: true,
-          is_quick_order: true,
+          is_available: menuMeta.is_available !== false,
+          is_online_sale: menuMeta.is_online_sale !== false,
+          is_quick_order: menuMeta.is_quick_order !== false,
           extra_ids: [],
         };
         if (pid) {
@@ -253,6 +267,7 @@ export default function MenuManagement() {
 
         // Bölümleri opsiyon grubu olarak senkronla
         const usedIds = [];
+        let sIdx = 0;
         for (const sec of menuSections) {
           const cat = categories.find(c => c.id === parseInt(sec.category_id));
           const groupName = cat ? cat.name : 'Seçim';
@@ -262,6 +277,7 @@ export default function MenuManagement() {
             min_select: parseInt(sec.min_select) || 0,
             max_select: parseInt(sec.max_select) || 1,
             is_available: true,
+            sort_order: sIdx++,
             items: sec.items.map(it => ({ product_id: it.product_id, additional_price: parseFloat(it.additional_price) || 0 })),
             attached_product_ids: [pid],
           };
@@ -345,6 +361,7 @@ export default function MenuManagement() {
     if (type === 'product') handleDelete(id);
     else if (type === 'category') handleCatDelete(id);
     else if (type === 'extra') handleExtraDelete(id);
+    else if (type === 'option') handleOptionDelete(id);
     setDeleteConfirm(null);
   };
 
@@ -481,9 +498,9 @@ export default function MenuManagement() {
               <TableHead>
                 <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8' } }}>
                   <TableCell>Opsiyon Adı</TableCell>
-                  <TableCell>Opsiyon İçerisindeki Ürünler</TableCell>
-                  <TableCell>Bağlı Olduğu Ürünler</TableCell>
-                  <TableCell>Min-Max Adet</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Opsiyon İçerisindeki Ürünler</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Bağlı Olduğu Ürünler</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>Min-Max</TableCell>
                   <TableCell align="center">İşlemler</TableCell>
                 </TableRow>
               </TableHead>
@@ -494,15 +511,15 @@ export default function MenuManagement() {
                 {optionGroups.map(g => (
                   <TableRow key={g.id} hover>
                     <TableCell sx={{ fontWeight: 600 }}>{g.name}</TableCell>
-                    <TableCell sx={{ maxWidth: 280, fontSize: 13 }}>{(g.items || []).map(i => i.product?.name).filter(Boolean).join(', ') || '-'}</TableCell>
-                    <TableCell sx={{ maxWidth: 220, fontSize: 13 }}>{(g.attachedProducts || []).map(p => p.name).join(', ') || '-'}</TableCell>
+                    <TableCell sx={{ maxWidth: 280, fontSize: 13, display: { xs: 'none', md: 'table-cell' } }}>{(g.items || []).map(i => i.product?.name).filter(Boolean).join(', ') || '-'}</TableCell>
+                    <TableCell sx={{ maxWidth: 220, fontSize: 13, display: { xs: 'none', sm: 'table-cell' } }}>{(g.attachedProducts || []).map(p => p.name).join(', ') || '-'}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{g.min_select} - {g.max_select}</TableCell>
                     <TableCell align="center">
-                      <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                      <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" sx={{ flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
                         <Chip label={g.is_available ? 'Satışa Açık' : 'Kapalı'} size="small" onClick={() => toggleOptionAvailable(g)}
                           sx={{ cursor: 'pointer', bgcolor: g.is_available ? '#dcfce7' : '#fee2e2', color: g.is_available ? '#16a34a' : '#dc2626', fontWeight: 600 }} />
                         <IconButton size="small" color="primary" onClick={() => openEditOption(g)}><EditIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleOptionDelete(g.id)}><DeleteIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" color="error" onClick={() => setDeleteConfirm({ type: 'option', id: g.id, name: g.name })}><DeleteIcon fontSize="small" /></IconButton>
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -666,6 +683,20 @@ export default function MenuManagement() {
                   }} />
                 </Button>
               </Stack>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap' }}>
+                <FormControlLabel
+                  control={<Switch size="small" checked={menuMeta.is_available !== false} onChange={e => setMenuMeta(m => ({ ...m, is_available: e.target.checked }))} />}
+                  label="Satışa Açık"
+                />
+                <FormControlLabel
+                  control={<Switch size="small" checked={menuMeta.is_online_sale !== false} onChange={e => setMenuMeta(m => ({ ...m, is_online_sale: e.target.checked }))} />}
+                  label="Online'da Aktif"
+                />
+                <FormControlLabel
+                  control={<Switch size="small" checked={menuMeta.is_quick_order !== false} onChange={e => setMenuMeta(m => ({ ...m, is_quick_order: e.target.checked }))} />}
+                  label="Masada Aktif"
+                />
+              </Stack>
             </Box>
           )}
 
@@ -687,6 +718,8 @@ export default function MenuManagement() {
                   <Box key={idx} sx={{ p: 1.5, mb: 1.5, border: '1px solid #e5e7eb', borderRadius: 2, bgcolor: '#fafafa' }}>
                     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 700, flex: 1 }}>Bölüm {idx + 1} {cat ? `— ${cat.name}` : ''}</Typography>
+                      <IconButton size="small" disabled={idx === 0} onClick={() => moveMenuSection(idx, -1)} title="Yukarı taşı"><ArrowUpwardIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" disabled={idx === menuSections.length - 1} onClick={() => moveMenuSection(idx, 1)} title="Aşağı taşı"><ArrowDownwardIcon fontSize="small" /></IconButton>
                       <IconButton size="small" color="error" onClick={() => removeMenuSection(idx)}><DeleteIcon fontSize="small" /></IconButton>
                     </Stack>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ mb: 1 }}>
@@ -818,7 +851,7 @@ export default function MenuManagement() {
         <DialogTitle sx={{ fontWeight: 700, color: '#dc2626' }}>Silme Onayı</DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mt: 1 }}>
-            <b>"{deleteConfirm?.name}"</b> {deleteConfirm?.type === 'product' ? 'ürününü' : deleteConfirm?.type === 'category' ? 'kategorisini' : 'ekstrasını'} silmek istediğinize emin misiniz?
+            <b>"{deleteConfirm?.name}"</b> {deleteConfirm?.type === 'product' ? 'ürününü' : deleteConfirm?.type === 'category' ? 'kategorisini' : deleteConfirm?.type === 'option' ? 'opsiyonunu' : 'ekstrasını'} silmek istediğinize emin misiniz?
           </Typography>
           <Typography variant="body2" color="error" sx={{ mt: 1 }}>Bu işlem geri alınamaz.</Typography>
         </DialogContent>

@@ -257,7 +257,11 @@ const getAllProductsAdmin = async (req, res) => {
           include: [{ model: OptionGroupItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }] }],
         },
       ],
-      order: [['category_id', 'ASC'], ['sort_order', 'ASC']],
+      order: [
+        ['category_id', 'ASC'],
+        ['sort_order', 'ASC'],
+        [{ model: OptionGroup, as: 'optionGroups' }, 'sort_order', 'ASC'],
+      ],
     });
     res.json(products);
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
