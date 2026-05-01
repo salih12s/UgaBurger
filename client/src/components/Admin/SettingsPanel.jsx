@@ -369,7 +369,7 @@ export default function SettingsPanel() {
                 const file = e.target.files[0]; if (!file) return;
                 const fd = new FormData(); fd.append('image', file);
                 try {
-                  const res = await api.post('/admin/upload', fd);
+                  const res = await api.post('/admin/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
                   upd('hero_image', res.data.url);
                   toast.success('Yüklendi');
                 } catch (err) {
