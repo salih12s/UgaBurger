@@ -52,39 +52,12 @@ export default function HomePage() {
 
   return (
     <Box sx={{
-      position: 'relative', width: '100%', height: '100vh', overflow: 'hidden',
+      position: 'relative', width: '100%', height: '100vh',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      bgcolor: '#000',
+      backgroundImage: `url(${heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
-      {/* Bulanik dolgu (bos alanlari kapatir) */}
-      <Box
-        component="img"
-        src={heroImage}
-        alt=""
-        aria-hidden
-        sx={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%',
-          objectFit: 'cover', objectPosition: 'center',
-          filter: 'blur(24px) brightness(0.6)', transform: 'scale(1.1)',
-          zIndex: 0,
-        }}
-      />
-      {/* Asil resim - tam sigsin, kirpilmasin */}
-      <Box
-        component="img"
-        src={heroImage}
-        alt=""
-        loading="eager"
-        decoding="async"
-        sx={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%',
-          objectFit: 'contain', objectPosition: 'center',
-          imageRendering: 'high-quality',
-          zIndex: 1,
-        }}
-      />
-      <Box sx={{ position: 'absolute', inset: 0, zIndex: 2, background: `linear-gradient(to top, rgba(0,0,0,${Math.min(heroOverlay + 0.1, 1).toFixed(2)}) 0%, rgba(0,0,0,${(heroOverlay * 0.3).toFixed(2)}) 50%, rgba(0,0,0,${(heroOverlay * 0.5).toFixed(2)}) 100%)` }} />
-      <Box sx={{ position: 'relative', zIndex: 3, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Box sx={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, rgba(0,0,0,${Math.min(heroOverlay + 0.1, 1).toFixed(2)}) 0%, rgba(0,0,0,${(heroOverlay * 0.3).toFixed(2)}) 50%, rgba(0,0,0,${(heroOverlay * 0.5).toFixed(2)}) 100%)` }} />
+      <Box sx={{ position: 'relative', zIndex: 2, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Typography variant="h1" sx={{
           fontSize: heroTextSize, fontWeight: 900, color: heroTextColor,
           textShadow: '2px 4px 24px rgba(0,0,0,0.7)', mb: 4, fontStyle: 'italic',
