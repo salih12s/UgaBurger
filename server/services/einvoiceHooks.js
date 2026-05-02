@@ -9,7 +9,10 @@ async function autoSendInvoiceForOrder(order) {
   try {
     if (String(process.env.EINVOICE_AUTO_SEND).toLowerCase() !== 'true') return;
     if (!order) return;
-    if (order.einvoice_status === 'sent' || order.einvoice_status === 'delivered') return;
+    // Dedupe: zaten gonderilmis / taslak olarak yuklenmis / onizleme maili gitmis siparislerde tekrar gonderme.
+    // Sadece 'failed' veya hic denenmemis ('pending'/null) durumlarda yeniden dene.
+    const alreadyHandled = ['sent', 'delivered', 'draft', 'preview_sent'];
+    if (order.einvoice_status && alreadyHandled.includes(order.einvoice_status)) return;
 
     // items yüklü değilse yükle
     if (!order.items) {

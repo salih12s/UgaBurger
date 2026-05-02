@@ -118,7 +118,7 @@ export default function SettingsPanel() {
     const pairs = [
       ['min_order_amount', s('min_order_amount','1')],
       ['store_phone', s('store_phone')], ['store_address', s('store_address')],
-      ['site_icon', s('site_icon','🍔')], ['site_name', s('site_name','MUSATTI BURGER')],
+      ['site_icon', s('site_icon','🍔')], ['site_name', s('site_name','UGA BURGER')],
       ['closed_message', s('closed_message','Şuanda online sipariş hizmeti verilmemektedir.')],
       ['closed_banner_color', s('closed_banner_color','#427cf0')],
       ['closed_banner_icon', s('closed_banner_icon','❤️')],
@@ -127,7 +127,7 @@ export default function SettingsPanel() {
       ['hero_overlay', s('hero_overlay','60')],
       ['hero_text_color', s('hero_text_color','#FFFFFF')],
       ['hero_text_size', s('hero_text_size','medium')],
-      ['receipt_title', s('receipt_title','MUSATTI BURGER')],
+      ['receipt_title', s('receipt_title','UGA BURGER')],
       ['receipt_footer', s('receipt_footer','Afiyet Olsun!')],
       ['receipt_font_size', s('receipt_font_size','medium')],
       ['receipt_show_date', s('receipt_show_date','true')],
@@ -313,7 +313,7 @@ export default function SettingsPanel() {
           </Box>
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Site İsmi (Header)</Typography>
-            <TextField fullWidth size="small" value={s('site_name', 'MUSATTI BURGER')} onChange={e => upd('site_name', e.target.value)} />
+            <TextField fullWidth size="small" value={s('site_name', 'UGA BURGER')} onChange={e => upd('site_name', e.target.value)} />
           </Box>
         </Box>
       </Section>
@@ -409,7 +409,7 @@ export default function SettingsPanel() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Fiş Başlığı</Typography>
-            <TextField fullWidth size="small" value={s('receipt_title', 'MUSATTI BURGER')} onChange={e => upd('receipt_title', e.target.value)} sx={{ mb: 2 }} />
+            <TextField fullWidth size="small" value={s('receipt_title', 'UGA BURGER')} onChange={e => upd('receipt_title', e.target.value)} sx={{ mb: 2 }} />
             <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Alt Not (Footer)</Typography>
             <TextField fullWidth size="small" multiline rows={2} value={s('receipt_footer', 'Afiyet Olsun!')} onChange={e => upd('receipt_footer', e.target.value)} sx={{ mb: 2 }} />
             <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Yazı Boyutu</Typography>
@@ -449,7 +449,7 @@ export default function SettingsPanel() {
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 600, textAlign: 'center', display: 'block', mb: 1 }}>CANLI ÖNİZLEME (80MM)</Typography>
             <Card variant="outlined" sx={{ p: 2, fontFamily: 'Courier New, monospace', fontSize: receiptFontPx, maxWidth: 300, mx: 'auto', bgcolor: '#fff' }}>
-              <Box sx={{ textAlign: 'center', fontWeight: 700, fontSize: receiptFontPx + 6, mb: 0.3 }}>{s('receipt_title', 'MUSATTI BURGER')}</Box>
+              <Box sx={{ textAlign: 'center', fontWeight: 700, fontSize: receiptFontPx + 6, mb: 0.3 }}>{s('receipt_title', 'UGA BURGER')}</Box>
               <Box sx={{ borderTop: '1px dashed #000', my: 0.5 }} />
               {s('receipt_show_order_no', 'true') === 'true' && <Box sx={{ textAlign: 'center', fontWeight: 700, fontSize: receiptFontPx + 2 }}>#1024</Box>}
               {s('receipt_show_date', 'true') === 'true' && <Box sx={{ textAlign: 'center', fontSize: receiptFontPx - 2 }}>30.01.2026{s('receipt_show_time', 'true') === 'true' ? ' 14:30' : ''}</Box>}

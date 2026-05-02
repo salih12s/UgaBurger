@@ -46,7 +46,7 @@ const getPaytrToken = async (req, res) => {
     // Kullanıcı bilgileri
     const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
     const merchantOid = `SP${order.id}T${Date.now()}`;
-    const email = req.user.email || 'musteri@ugaburger.com';
+    const email = req.user.email || 'ugaburger33@gmail.com';
     const paymentAmount = Math.round(parseFloat(order.total_amount) * 100); // Kuruş cinsinden
     const userName = req.user.name || 'Müşteri';
     const userAddress = order.delivery_address || 'Adres bilgisi yok';

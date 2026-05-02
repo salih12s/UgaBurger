@@ -144,6 +144,7 @@ export default function MenuManagement() {
       const firstCat = g.items?.[0]?.product?.category_id || categories[0]?.id || '';
       return {
         id: g.id,
+        name: g.name || '',
         category_id: firstCat,
         multi_select: !!g.multi_select,
         min_select: g.min_select ?? 1,
@@ -162,7 +163,7 @@ export default function MenuManagement() {
   };
 
   const addMenuSection = () => {
-    setMenuSections(s => [...s, { category_id: categories[0]?.id || '', multi_select: false, min_select: 1, max_select: 1, items: [] }]);
+    setMenuSections(s => [...s, { name: '', category_id: categories[0]?.id || '', multi_select: false, min_select: 1, max_select: 1, items: [] }]);
   };
   const removeMenuSection = (idx) => {
     setMenuSections(s => s.filter((_, i) => i !== idx));
@@ -270,7 +271,8 @@ export default function MenuManagement() {
         let sIdx = 0;
         for (const sec of menuSections) {
           const cat = categories.find(c => c.id === parseInt(sec.category_id));
-          const groupName = cat ? cat.name : 'Seçim';
+          const customName = (sec.name || '').trim();
+          const groupName = customName || (cat ? cat.name : 'Seçim');
           const payload = {
             name: groupName,
             multi_select: !!sec.multi_select,
@@ -400,8 +402,6 @@ export default function MenuManagement() {
             sx={{ fontWeight: 600, ...(tab === 'products' && { bgcolor: '#dc2626', color: '#fff' }) }} />
           <Chip label="Ekstralar" onClick={() => setTab('extras')} variant={tab === 'extras' ? 'filled' : 'outlined'}
             sx={{ fontWeight: 600, ...(tab === 'extras' && { bgcolor: '#dc2626', color: '#fff' }) }} />
-          <Chip label="Opsiyonlar" onClick={() => setTab('options')} variant={tab === 'options' ? 'filled' : 'outlined'}
-            sx={{ fontWeight: 600, ...(tab === 'options' && { bgcolor: '#dc2626', color: '#fff' }) }} />
           <Chip label="Kategoriler" onClick={() => setTab('categories')} variant={tab === 'categories' ? 'filled' : 'outlined'}
             sx={{ fontWeight: 600, ...(tab === 'categories' && { bgcolor: '#dc2626', color: '#fff' }) }} />
           <Chip label="Önerilen" onClick={() => setTab('recommended')} variant={tab === 'recommended' ? 'filled' : 'outlined'}
@@ -491,43 +491,9 @@ export default function MenuManagement() {
       )}
 
       {tab === 'options' && (
-        <Card sx={{ p: 2.5 }}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openNewOption} sx={{ mb: 2, fontWeight: 600, bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' } }}>Yeni Opsiyon Ekle</Button>
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: '#f8f8f8' } }}>
-                  <TableCell>Opsiyon Adı</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Opsiyon İçerisindeki Ürünler</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Bağlı Olduğu Ürünler</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>Min-Max</TableCell>
-                  <TableCell align="center">İşlemler</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {optionGroups.length === 0 && (
-                  <TableRow><TableCell colSpan={5}><Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>Henüz opsiyon grubu yok</Typography></TableCell></TableRow>
-                )}
-                {optionGroups.map(g => (
-                  <TableRow key={g.id} hover>
-                    <TableCell sx={{ fontWeight: 600 }}>{g.name}</TableCell>
-                    <TableCell sx={{ maxWidth: 280, fontSize: 13, display: { xs: 'none', md: 'table-cell' } }}>{(g.items || []).map(i => i.product?.name).filter(Boolean).join(', ') || '-'}</TableCell>
-                    <TableCell sx={{ maxWidth: 220, fontSize: 13, display: { xs: 'none', sm: 'table-cell' } }}>{(g.attachedProducts || []).map(p => p.name).join(', ') || '-'}</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{g.min_select} - {g.max_select}</TableCell>
-                    <TableCell align="center">
-                      <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" sx={{ flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-                        <Chip label={g.is_available ? 'Satışa Açık' : 'Kapalı'} size="small" onClick={() => toggleOptionAvailable(g)}
-                          sx={{ cursor: 'pointer', bgcolor: g.is_available ? '#dcfce7' : '#fee2e2', color: g.is_available ? '#16a34a' : '#dc2626', fontWeight: 600 }} />
-                        <IconButton size="small" color="primary" onClick={() => openEditOption(g)}><EditIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" color="error" onClick={() => setDeleteConfirm({ type: 'option', id: g.id, name: g.name })}><DeleteIcon fontSize="small" /></IconButton>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-        </Card>
+        // Eski "Opsiyonlar" sekmesi kaldırıldı; tüm opsiyonlu menüler "Ürünler" sekmesinden yönetilir.
+        // Geriye dönük uyumluluk için boş bırakıldı.
+        null
       )}
 
       {tab === 'categories' && (
@@ -722,6 +688,15 @@ export default function MenuManagement() {
                       <IconButton size="small" disabled={idx === menuSections.length - 1} onClick={() => moveMenuSection(idx, 1)} title="Aşağı taşı"><ArrowDownwardIcon fontSize="small" /></IconButton>
                       <IconButton size="small" color="error" onClick={() => removeMenuSection(idx)}><DeleteIcon fontSize="small" /></IconButton>
                     </Stack>
+                    <TextField
+                      size="small" fullWidth
+                      label="Opsiyon Adı (örn. Burger Seçimi)"
+                      placeholder={cat ? cat.name : 'Seçim'}
+                      value={sec.name || ''}
+                      onChange={e => updateMenuSection(idx, { name: e.target.value })}
+                      helperText="Boş bırakılırsa kategori adı kullanılır."
+                      sx={{ mb: 1 }}
+                    />
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ mb: 1 }}>
                       <FormControl size="small" sx={{ flex: 2 }}>
                         <InputLabel>Kategori</InputLabel>
