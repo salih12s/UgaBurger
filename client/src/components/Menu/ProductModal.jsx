@@ -110,6 +110,16 @@ export default function ProductModal({ product, onClose }) {
             const selectedList = selectedOptions[group.id] || [];
             const isComplete = selectedList.length >= (group.min_select || 0);
             const summary = selectedList.map(s => s.name).join(', ');
+            // Bu grubun çoğunluk kategorisi (geçmiş verilerde karışmış kategorileri temizlemek için)
+            const catCounts = {};
+            (group.items || []).forEach(it => {
+              const cid = it.product?.category_id;
+              if (cid != null) catCounts[cid] = (catCounts[cid] || 0) + 1;
+            });
+            const dominantCat = Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])[0];
+            const visibleItems = dominantCat
+              ? (group.items || []).filter(it => String(it.product?.category_id) === String(dominantCat))
+              : (group.items || []);
             return (
               <Accordion key={group.id} disableGutters elevation={0} defaultExpanded
                 sx={{
@@ -136,7 +146,7 @@ export default function ProductModal({ product, onClose }) {
                   </Stack>
                 </AccordionSummary>
                 <AccordionDetails sx={{ pt: 0, pb: 1.5 }}>
-                  {(group.items || []).map(item => {
+                  {visibleItems.map(item => {
                     const isSelected = !!selectedList.find(s => s.id === `og_${item.id}`);
                     const addPrice = parseFloat(item.additional_price) || 0;
                     return (

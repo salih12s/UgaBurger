@@ -11,22 +11,40 @@ import { Box, Button, Chip, Stack, Typography, Fab, Badge } from '@mui/material'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 
 export default function MenuPage() {
-  const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  // İlk render'da localStorage cache'inden başlat -> menü ve resimler anında görünür, sonra arka planda tazelenir
+  const [categories, setCategories] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('menuCategoriesCache') || '[]'); } catch { return []; }
+  });
+  const [products, setProducts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('menuProductsCache') || '[]'); } catch { return []; }
+  });
   const [activeCategory, setActiveCategory] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showOrder, setShowOrder] = useState(false);
   const [showAddressFirst, setShowAddressFirst] = useState(false);
-  const [settings, setSettings] = useState({});
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settings, setSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('siteSettingsCache') || '{}'); } catch { return {}; }
+  });
+  const [settingsLoaded, setSettingsLoaded] = useState(() => {
+    try { return !!localStorage.getItem('siteSettingsCache'); } catch { return false; }
+  });
   const { totalItems, totalAmount } = useCart();
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/categories').then(res => setCategories(res.data));
-    api.get('/products').then(res => setProducts(res.data));
-    api.get('/settings').then(res => { setSettings(res.data); setSettingsLoaded(true); });
+    api.get('/categories').then(res => {
+      setCategories(res.data);
+      try { localStorage.setItem('menuCategoriesCache', JSON.stringify(res.data)); } catch {}
+    });
+    api.get('/products').then(res => {
+      setProducts(res.data);
+      try { localStorage.setItem('menuProductsCache', JSON.stringify(res.data)); } catch {}
+    });
+    api.get('/settings').then(res => {
+      setSettings(res.data); setSettingsLoaded(true);
+      try { localStorage.setItem('siteSettingsCache', JSON.stringify(res.data)); } catch {}
+    });
   }, []);
 
   const filteredProducts = activeCategory

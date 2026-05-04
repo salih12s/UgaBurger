@@ -125,7 +125,7 @@ const updateOrderStatus = async (req, res) => {
 const createQuickOrder = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { items, table_id, order_note, payment_method, customer_name, customer_phone, delivery_address, cash_amount } = req.body;
+    const { items, table_id, order_note, payment_method, customer_name, customer_phone, delivery_address, cash_amount, promo_code } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Ürün seçiniz' });
@@ -147,6 +147,28 @@ const createQuickOrder = async (req, res) => {
 
       total_amount += itemTotal;
       orderItemsData.push({ product_id: item.product_id, quantity: item.quantity, unit_price: unitPrice, extras });
+    }
+
+    // --- Promosyon kodu (opsiyonel) ---
+    // Admin endpoint olduğu için: kullanım limiti, süre ve min sipariş kontrolü uygulanmaz (admin sınırsız kullanabilir).
+    let appliedPromoCode = null;
+    let appliedDiscount = 0;
+    if (promo_code) {
+      const promo = await PromoCode.findOne({ where: { code: String(promo_code).toUpperCase(), is_active: true } });
+      if (promo) {
+        let discount = 0;
+        if (promo.discount_type === 'percentage') {
+          discount = total_amount * parseFloat(promo.discount_value) / 100;
+        } else {
+          discount = parseFloat(promo.discount_value);
+        }
+        discount = Math.min(discount, total_amount);
+        appliedDiscount = parseFloat(discount.toFixed(2));
+        appliedPromoCode = promo.code;
+        total_amount = parseFloat((total_amount - discount).toFixed(2));
+        promo.used_count += 1;
+        await promo.save({ transaction: t });
+      }
     }
 
     // --- Split payment (kısmi nakit) hesaplama ---
@@ -188,6 +210,8 @@ const createQuickOrder = async (req, res) => {
       cash_amount: storedCashAmount,
       customer_name: customer_name || null,
       customer_phone: customer_phone || null,
+      promo_code: appliedPromoCode,
+      discount_amount: appliedDiscount,
     }, { transaction: t });
 
     for (const itemData of orderItemsData) {
@@ -254,7 +278,7 @@ const getAllProductsAdmin = async (req, res) => {
           model: OptionGroup,
           as: 'optionGroups',
           through: { attributes: [] },
-          include: [{ model: OptionGroupItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }] }],
+          include: [{ model: OptionGroupItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url', 'category_id'] }] }],
         },
       ],
       order: [
@@ -632,7 +656,7 @@ const includeFullOptionGroup = [
   {
     model: OptionGroupItem,
     as: 'items',
-    include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }],
+    include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url', 'category_id'] }],
   },
 ];
 

@@ -180,21 +180,23 @@ const validatePromoCode = async (req, res) => {
     const promo = await PromoCode.findOne({ where: { code: code.toUpperCase(), is_active: true } });
     if (!promo) return res.status(404).json({ error: 'Geçersiz promosyon kodu' });
 
-    // Kullanıcı bu kodu daha önce kullandı mı?
-    if (req.user) {
+    const isAdmin = req.user && req.user.role === 'admin';
+
+    // Kullanıcı bu kodu daha önce kullandı mı? (admin sınırsız kullanabilir)
+    if (req.user && !isAdmin) {
       const alreadyUsed = await Order.findOne({ where: { user_id: req.user.id, promo_code: promo.code } });
       if (alreadyUsed) return res.status(400).json({ error: 'Bu promosyon kodunu daha önce kullandınız' });
     }
 
     const now = new Date();
-    if (promo.expires_at && new Date(promo.expires_at) <= now) {
+    if (!isAdmin && promo.expires_at && new Date(promo.expires_at) <= now) {
       return res.status(400).json({ error: 'Bu promosyon kodunun süresi dolmuş' });
     }
-    if (promo.max_uses && promo.used_count >= promo.max_uses) {
+    if (!isAdmin && promo.max_uses && promo.used_count >= promo.max_uses) {
       return res.status(400).json({ error: 'Bu promosyon kodu kullanım limitine ulaşmış' });
     }
     const total = parseFloat(order_total || 0);
-    if (total < parseFloat(promo.min_order_amount || 0)) {
+    if (!isAdmin && total < parseFloat(promo.min_order_amount || 0)) {
       return res.status(400).json({ error: `Minimum sipariş tutarı: ${parseFloat(promo.min_order_amount).toFixed(2)} TL` });
     }
 

@@ -3,14 +3,19 @@ import { Box, Typography, Stack, Dialog, DialogTitle, DialogContent, DialogActio
 import api from '../../api/api';
 
 export default function Footer() {
-  const [siteName, setSiteName] = useState('Uga Burger');
-  const [settings, setSettings] = useState({});
+  const cached = (() => { try { return JSON.parse(localStorage.getItem('siteSettingsCache') || '{}'); } catch { return {}; } })();
+  const [siteName, setSiteName] = useState(cached.site_name || 'Uga Burger');
+  const [settings, setSettings] = useState(cached);
   const [legalDialog, setLegalDialog] = useState(null);
 
   useEffect(() => {
+    let hasCache = false;
+    try { hasCache = !!localStorage.getItem('siteSettingsCache'); } catch {}
+    if (hasCache) return;
     api.get('/settings').then(r => {
       setSettings(r.data);
       if (r.data.site_name) setSiteName(r.data.site_name);
+      try { localStorage.setItem('siteSettingsCache', JSON.stringify(r.data)); } catch {}
     }).catch(() => {});
   }, []);
 

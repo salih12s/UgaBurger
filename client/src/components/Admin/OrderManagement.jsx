@@ -263,7 +263,7 @@ export default function OrderManagement() {
     const phone = order.user?.phone || order.customer_phone || '';
     const payment = paymentLabel(order.payment_method, order.order_type, order);
 
-    const rTitle = settings.receipt_title || 'MUSATTI BURGER';
+    const rTitle = settings.receipt_title || 'UGA BURGER';
     const rFooter = settings.receipt_footer || 'Afiyet Olsun!';
     const rFontPx = { small: 12, medium: 14, large: 16 }[settings.receipt_font_size] || 14;
     const showDate = settings.receipt_show_date !== 'false';

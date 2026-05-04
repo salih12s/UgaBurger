@@ -24,6 +24,11 @@ export default function TableOrders() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [settings, setSettings] = useState({});
 
+  // Promosyon kodu
+  const [promoCode, setPromoCode] = useState('');
+  const [promoResult, setPromoResult] = useState(null); // { code, discount_amount, new_total }
+  const [promoLoading, setPromoLoading] = useState(false);
+
   // Extras dialog
   const [extrasDialog, setExtrasDialog] = useState(null);
   const [selectedExtras, setSelectedExtras] = useState([]);
@@ -128,6 +133,25 @@ export default function TableOrders() {
     const extrasTotal = i.extras.reduce((es, e) => es + parseFloat(e.price) * (e.quantity || 1), 0);
     return s + (parseFloat(i.price) + extrasTotal) * i.quantity;
   }, 0);
+
+  const discountAmount = promoResult ? parseFloat(promoResult.discount_amount) || 0 : 0;
+  const finalTotal = Math.max(0, cartTotal - discountAmount);
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) { toast.error('Promosyon kodu girin'); return; }
+    if (cartTotal <= 0) { toast.error('Önce ürün ekleyin'); return; }
+    setPromoLoading(true);
+    try {
+      const res = await api.post('/orders/validate-promo', { code: promoCode.trim(), order_total: cartTotal });
+      setPromoResult(res.data);
+      toast.success(`İndirim uygulandı: -${parseFloat(res.data.discount_amount).toFixed(2)} TL`);
+    } catch (err) {
+      setPromoResult(null);
+      toast.error(err.response?.data?.error || 'Geçersiz kod');
+    } finally { setPromoLoading(false); }
+  };
+
+  const removePromo = () => { setPromoResult(null); setPromoCode(''); };
 
   const printReceipt = (order) => {
     const items = order.items || [];
@@ -236,7 +260,7 @@ export default function TableOrders() {
     // Kısmi nakit doğrulaması
     let cashAmt = parseFloat(cashSplitAmount);
     if (cashSplitAmount === '' || isNaN(cashAmt) || cashAmt <= 0) cashAmt = null;
-    if (cashAmt !== null && cashAmt > cartTotal) {
+    if (cashAmt !== null && cashAmt > finalTotal) {
       toast.error('Nakit tutar toplamdan büyük olamaz');
       return;
     }
@@ -253,11 +277,13 @@ export default function TableOrders() {
         customer_name: customerName || null,
         customer_phone: customerPhone || null,
         delivery_address: customerAddress || null,
+        promo_code: promoResult ? promoResult.code : null,
       });
       toast.success('Hızlı sipariş oluşturuldu!');
       setCartItems([]); setOrderNote(''); setSelectedTable(''); setPaymentType('cash');
       setCustomerName(''); setCustomerPhone(''); setCustomerAddress('');
       setCashSplitAmount('');
+      setPromoCode(''); setPromoResult(null);
       if (settings.receipt_auto_print !== 'false') {
         setTimeout(() => printReceipt(res.data), 100);
       }
@@ -382,10 +408,10 @@ export default function TableOrders() {
             </Stack>
             {(() => {
               const c = parseFloat(cashSplitAmount);
-              if (!isNaN(c) && c > 0 && c < cartTotal) {
+              if (!isNaN(c) && c > 0 && c < finalTotal) {
                 return (
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#3b82f6', fontWeight: 600 }}>
-                    Kart tutarı: {(cartTotal - c).toFixed(2)} TL
+                    Kart tutarı: {(finalTotal - c).toFixed(2)} TL
                   </Typography>
                 );
               }
@@ -393,9 +419,63 @@ export default function TableOrders() {
             })()}
           </Box>
 
+          {/* Promosyon Kodu */}
+          <Box sx={{ mb: 1, p: 1, borderRadius: 1, border: '1px dashed #d1d5db', bgcolor: '#fafafa' }}>
+            <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700, display: 'block', mb: 0.5 }}>
+              🎟️ Promosyon Kodum Var
+            </Typography>
+            {!promoResult ? (
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  size="small"
+                  placeholder="KOD"
+                  value={promoCode}
+                  onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={handleApplyPromo}
+                  disabled={promoLoading}
+                  sx={{ bgcolor: '#dc2626', fontWeight: 700, '&:hover': { bgcolor: '#b91c1c' } }}
+                >
+                  Uygula
+                </Button>
+              </Stack>
+            ) : (
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700, display: 'block' }}>
+                    ✔ {promoResult.code} uygulandı
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#16a34a' }}>
+                    İndirim: -{parseFloat(promoResult.discount_amount).toFixed(2)} TL
+                  </Typography>
+                </Box>
+                <Button size="small" onClick={removePromo} sx={{ color: '#dc2626', fontWeight: 700, fontSize: 11 }}>
+                  Kaldır
+                </Button>
+              </Stack>
+            )}
+          </Box>
+
+          {discountAmount > 0 && (
+            <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+              <Typography sx={{ color: '#666', fontSize: 13 }}>Ara Toplam</Typography>
+              <Typography sx={{ color: '#666', fontSize: 13, textDecoration: 'line-through' }}>{cartTotal.toFixed(2)} TL</Typography>
+            </Stack>
+          )}
+          {discountAmount > 0 && (
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>İndirim</Typography>
+              <Typography sx={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>-{discountAmount.toFixed(2)} TL</Typography>
+            </Stack>
+          )}
+
           <Stack direction="row" justifyContent="space-between" sx={{ my: 1 }}>
             <Typography sx={{ fontWeight: 800, fontSize: 16 }}>Toplam</Typography>
-            <Typography sx={{ fontWeight: 800, fontSize: 16 }}>{cartTotal.toFixed(2)} TL</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: 16 }}>{finalTotal.toFixed(2)} TL</Typography>
           </Stack>
 
           <Button fullWidth variant="contained" color="success" onClick={submitQuickOrder} sx={{ py: 1.5, fontWeight: 700, fontSize: 15 }}>

@@ -12,10 +12,20 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [siteSettings, setSiteSettings] = useState({});
+  const [siteSettings, setSiteSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('siteSettingsCache') || '{}'); } catch { return {}; }
+  });
 
   useEffect(() => {
-    api.get('/settings').then(res => setSiteSettings(res.data)).catch(() => {});
+    // Cache yoksa veya boşsa API'den çek; varsa kullan (sayfalar arası geçişte flicker olmasın).
+    // Admin ayarları kaydettiğinde SettingsPanel cache'i tazeler.
+    let hasCache = false;
+    try { hasCache = !!localStorage.getItem('siteSettingsCache'); } catch {}
+    if (hasCache) return;
+    api.get('/settings').then(res => {
+      setSiteSettings(res.data);
+      try { localStorage.setItem('siteSettingsCache', JSON.stringify(res.data)); } catch {}
+    }).catch(() => {});
   }, []);
 
   const siteIcon = siteSettings.site_icon || '🍔';

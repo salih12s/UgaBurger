@@ -158,6 +158,8 @@ export default function SettingsPanel() {
       // Kaydetme sonrası ayarları yeniden yükle (senkron tutmak için)
       const fresh = await api.get('/admin/settings');
       setSettings(fresh.data);
+      // Public site (Navbar/Footer/HomePage/MenuPage) anında güncel görsünler diye localStorage cache'i tazele
+      try { localStorage.setItem('siteSettingsCache', JSON.stringify(fresh.data)); } catch {}
       toast.success('Tüm ayarlar kaydedildi!');
     } catch { toast.error('Kaydetme hatası'); }
     setLoading(false);
@@ -597,7 +599,19 @@ export default function SettingsPanel() {
           <TextField size="small" label={newPromo.discount_type === 'percentage' ? 'İndirim (%)' : 'İndirim (TL)'} type="number" value={newPromo.discount_value} onChange={e => setNewPromo(p => ({ ...p, discount_value: e.target.value }))} />
           <TextField size="small" label="Min. Sipariş (TL)" type="number" value={newPromo.min_order_amount} onChange={e => setNewPromo(p => ({ ...p, min_order_amount: e.target.value }))} />
           <TextField size="small" label="Maks. Kullanım" type="number" value={newPromo.max_uses} onChange={e => setNewPromo(p => ({ ...p, max_uses: e.target.value }))} helperText="Boş = sınırsız" />
-          <TextField size="small" label="Son Kullanma" type="date" value={newPromo.expires_at} onChange={e => setNewPromo(p => ({ ...p, expires_at: e.target.value }))} InputLabelProps={{ shrink: true }} helperText="Boş = süresiz" />
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: '#666', display: 'block', mb: 0.5, ml: 0.5 }}>
+              Son Kullanma
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              type="date"
+              value={newPromo.expires_at}
+              onChange={e => setNewPromo(p => ({ ...p, expires_at: e.target.value }))}
+              helperText="Boş = süresiz"
+            />
+          </Box>
         </Box>
         <Button variant="contained" size="small" onClick={addPromo} sx={{ mb: 2, fontWeight: 700 }}>+ Kod Oluştur</Button>
 

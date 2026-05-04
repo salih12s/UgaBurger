@@ -36,15 +36,26 @@ function GoogleHomeBtn() {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState({});
+  // localStorage cache: ilk render'da en son bilinen ayarları kullan -> placeholder/eski resim flicker'ını önler
+  const [settings, setSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('siteSettingsCache') || '{}'); } catch { return {}; }
+  });
+  const [settingsLoaded, setSettingsLoaded] = useState(() => {
+    try { return !!localStorage.getItem('siteSettingsCache'); } catch { return false; }
+  });
 
   useEffect(() => {
     // Cache-bust ile ayarları her zaman taze getir (admin değişikliklerinin anında yansıması için)
-    api.get(`/settings?t=${Date.now()}`).then(r => setSettings(r.data)).catch(() => {});
+    api.get(`/settings?t=${Date.now()}`).then(r => {
+      setSettings(r.data);
+      setSettingsLoaded(true);
+      try { localStorage.setItem('siteSettingsCache', JSON.stringify(r.data)); } catch {}
+    }).catch(() => {});
   }, []);
 
   const heroTitle = settings.hero_title || 'Taş Devrinden Gelen Lezzet';
-  const heroImage = getImageUrl(settings.hero_image || '/images/smash_burger.jpg.jpeg');
+  // Sadece ayarlar yüklendiyse hero resmini göster; yoksa düz koyu zemin (eski/varsayılan resim flicker'ı yok)
+  const heroImage = settingsLoaded ? getImageUrl(settings.hero_image || '/images/smash_burger.jpg.jpeg') : null;
   const heroOverlay = parseInt(settings.hero_overlay || '60') / 100;
   const heroTextColor = settings.hero_text_color || '#fff';
   const textSizeMap = { small: { xs: 24, sm: 32, md: 38 }, medium: { xs: 30, sm: 40, md: 48 }, large: { xs: 36, sm: 48, md: 60 } };
@@ -54,7 +65,9 @@ export default function HomePage() {
     <Box sx={{
       position: 'relative', width: '100%', height: '100vh',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      backgroundImage: `url(${heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center',
+      backgroundColor: '#1a0a0a',
+      backgroundImage: heroImage ? `url(${heroImage})` : 'none',
+      backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
       <Box sx={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, rgba(0,0,0,${Math.min(heroOverlay + 0.1, 1).toFixed(2)}) 0%, rgba(0,0,0,${(heroOverlay * 0.3).toFixed(2)}) 50%, rgba(0,0,0,${(heroOverlay * 0.5).toFixed(2)}) 100%)` }} />
       <Box sx={{ position: 'relative', zIndex: 2, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

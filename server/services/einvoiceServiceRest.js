@@ -39,8 +39,8 @@ const cfg = () => ({
     city: process.env.EINVOICE_SENDER_CITY || 'Mersin',
     district: process.env.EINVOICE_SENDER_DISTRICT || 'Yenisehir',
     postcode: process.env.EINVOICE_SENDER_POSTCODE || '33000',
-    email: process.env.EINVOICE_SENDER_EMAIL || '',
-    phone: process.env.EINVOICE_SENDER_PHONE || '',
+    email: process.env.EINVOICE_SENDER_EMAIL || 'ugaburger33@gmail.com',
+    phone: process.env.EINVOICE_SENDER_PHONE || '05301257088',
   },
 });
 

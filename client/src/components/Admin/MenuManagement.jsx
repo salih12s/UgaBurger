@@ -141,7 +141,18 @@ export default function MenuManagement() {
     });
     setOptionForm({ name: p.name, multi_select: false, min_select: 1, max_select: 1, is_available: true, items: [], attached_product_ids: [] });
     const sections = (p.optionGroups || []).map(g => {
-      const firstCat = g.items?.[0]?.product?.category_id || categories[0]?.id || '';
+      // Önce items içindeki product.category_id'yi kullan; yoksa products listesinden çek (eski karışmış verileri de düzeltmek için en sık kategoriyi seç)
+      const catCounts = {};
+      (g.items || []).forEach(it => {
+        let cid = it.product?.category_id;
+        if (cid == null) {
+          const fp = products.find(pp => pp.id === it.product_id);
+          cid = fp?.category_id;
+        }
+        if (cid != null) catCounts[cid] = (catCounts[cid] || 0) + 1;
+      });
+      const dominantCat = Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])[0];
+      const firstCat = dominantCat ? parseInt(dominantCat) : (categories[0]?.id || '');
       return {
         id: g.id,
         name: g.name || '',
@@ -273,6 +284,11 @@ export default function MenuManagement() {
           const cat = categories.find(c => c.id === parseInt(sec.category_id));
           const customName = (sec.name || '').trim();
           const groupName = customName || (cat ? cat.name : 'Seçim');
+          // Sadece bu bölümün kategorisine ait ürünleri kaydet (önceki karışmış verileri de temizler)
+          const filteredItems = sec.items.filter(it => {
+            const prod = products.find(p => p.id === it.product_id);
+            return prod && parseInt(prod.category_id) === parseInt(sec.category_id);
+          });
           const payload = {
             name: groupName,
             multi_select: !!sec.multi_select,
@@ -280,7 +296,7 @@ export default function MenuManagement() {
             max_select: parseInt(sec.max_select) || 1,
             is_available: true,
             sort_order: sIdx++,
-            items: sec.items.map(it => ({ product_id: it.product_id, additional_price: parseFloat(it.additional_price) || 0 })),
+            items: filteredItems.map(it => ({ product_id: it.product_id, additional_price: parseFloat(it.additional_price) || 0 })),
             attached_product_ids: [pid],
           };
           if (sec.id) {

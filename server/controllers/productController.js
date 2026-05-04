@@ -21,7 +21,7 @@ const productInclude = [
     include: [{
       model: OptionGroupItem,
       as: 'items',
-      include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url'] }],
+      include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url', 'category_id'] }],
     }],
   },
 ];

@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { Order, OrderItem, Product, Setting } = require('../models');
+const { Order, OrderItem, Product, Setting, User } = require('../models');
 const sequelize = require('../config/db');
 
 const PAYTR_API_URL = 'https://www.paytr.com/odeme/api/get-token';
@@ -46,11 +46,13 @@ const getPaytrToken = async (req, res) => {
     // Kullanıcı bilgileri
     const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
     const merchantOid = `SP${order.id}T${Date.now()}`;
-    const email = req.user.email || 'ugaburger33@gmail.com';
+    // JWT yalnızca id/phone/role içeriyor; gerçek kayıtlı email + ad bilgilerini DB'den çek
+    const dbUser = await User.findByPk(req.user.id, { attributes: ['email', 'first_name', 'last_name', 'phone'] });
+    const email = order.billing_email || dbUser?.email || 'ugaburger33@gmail.com';
     const paymentAmount = Math.round(parseFloat(order.total_amount) * 100); // Kuruş cinsinden
-    const userName = req.user.name || 'Müşteri';
+    const userName = (dbUser ? `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() : '') || 'Müşteri';
     const userAddress = order.delivery_address || 'Adres bilgisi yok';
-    const userPhone = req.user.phone || '05000000000';
+    const userPhone = dbUser?.phone || '05000000000';
 
     // Sepet
     const basketItems = order.items.map(item => [
