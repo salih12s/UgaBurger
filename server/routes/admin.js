@@ -4,8 +4,12 @@ const ctrl = require('../controllers/adminController');
 
 router.use(authMiddleware, adminMiddleware);
 
+// Admin password reset (kendi şifresini e-posta linki ile sıfırlar)
+router.post('/send-password-reset', ctrl.sendAdminPasswordReset);
+
 // Orders
 router.get('/orders', ctrl.getAllOrders);
+router.get('/orders/pending-count', ctrl.getPendingOrdersCount);
 router.put('/orders/:id/status', ctrl.updateOrderStatus);
 
 // Quick order (table)

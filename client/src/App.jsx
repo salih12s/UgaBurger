@@ -4,20 +4,28 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import theme from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import Navbar from './components/Layout/Navbar';
 import Footer from './components/Layout/Footer';
 import HomePage from './components/Home/HomePage';
-import ContactPage from './components/Contact/ContactPage';
-import LoginPage from './components/Auth/LoginPage';
-import RegisterPage from './components/Auth/RegisterPage';
-import ResetPasswordPage from './components/Auth/ResetPasswordPage';
-import MenuPage from './components/Menu/MenuPage';
-import ProfilePage from './components/Profile/ProfilePage';
-import AdminLayout from './components/Admin/AdminLayout';
+
+// Performans: ana sayfa dışındaki büyük rotalar lazy yüklensin (initial JS bundle küçülür → LCP iyileşir)
+const ContactPage = lazy(() => import('./components/Contact/ContactPage'));
+const LoginPage = lazy(() => import('./components/Auth/LoginPage'));
+const RegisterPage = lazy(() => import('./components/Auth/RegisterPage'));
+const ResetPasswordPage = lazy(() => import('./components/Auth/ResetPasswordPage'));
+const MenuPage = lazy(() => import('./components/Menu/MenuPage'));
+const ProfilePage = lazy(() => import('./components/Profile/ProfilePage'));
+const AdminLayout = lazy(() => import('./components/Admin/AdminLayout'));
+
+const RouteFallback = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+    <CircularProgress />
+  </Box>
+);
 
 // PayTR ödeme sonuç sayfaları (iframe içinde gösterilir)
 function PaymentSuccess() {
@@ -77,15 +85,15 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
-      <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/menu'} /> : <><Navbar /><LoginPage /><Footer /></>} />
-      <Route path="/register" element={user ? <Navigate to="/menu" /> : <><Navbar /><RegisterPage /><Footer /></>} />
-      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-      <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
-      <Route path="/profile" element={user ? <><Navbar /><ProfilePage /><Footer /></> : <Navigate to="/login" />} />
+      <Route path="/contact" element={<Suspense fallback={<RouteFallback />}><><Navbar /><ContactPage /><Footer /></></Suspense>} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/menu'} /> : <Suspense fallback={<RouteFallback />}><><Navbar /><LoginPage /><Footer /></></Suspense>} />
+      <Route path="/register" element={user ? <Navigate to="/menu" /> : <Suspense fallback={<RouteFallback />}><><Navbar /><RegisterPage /><Footer /></></Suspense>} />
+      <Route path="/reset-password/:token" element={<Suspense fallback={<RouteFallback />}><ResetPasswordPage /></Suspense>} />
+      <Route path="/menu" element={<Suspense fallback={<RouteFallback />}><><Navbar /><MenuPage /><Footer /></></Suspense>} />
+      <Route path="/profile" element={user ? <Suspense fallback={<RouteFallback />}><><Navbar /><ProfilePage /><Footer /></></Suspense> : <Navigate to="/login" />} />
       <Route path="/odeme-basarili" element={<PaymentSuccess />} />
       <Route path="/odeme-hatasi" element={<PaymentFail />} />
-      <Route path="/admin/*" element={<ProtectedAdmin><AdminLayout /></ProtectedAdmin>} />
+      <Route path="/admin/*" element={<ProtectedAdmin><Suspense fallback={<RouteFallback />}><AdminLayout /></Suspense></ProtectedAdmin>} />
     </Routes>
   );
 }

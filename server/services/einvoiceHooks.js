@@ -2,17 +2,35 @@
  * Sipariş için otomatik e-fatura tetikleyici.
  * EINVOICE_AUTO_SEND=true ise çalışır. Hatalar log'lanır, akışı bozmaz.
  */
+const fs = require('fs');
+const path = require('path');
 const { OrderItem, Product } = require('../models');
 const { sendInvoiceForOrder } = require('./einvoiceService');
 
+const LOG_FILE = path.join(__dirname, '..', 'einvoice.log');
+function flog(msg) {
+  try {
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    fs.appendFileSync(LOG_FILE, line);
+    console.log(msg);
+  } catch {}
+}
+
 async function autoSendInvoiceForOrder(order) {
   try {
-    if (String(process.env.EINVOICE_AUTO_SEND).toLowerCase() !== 'true') return;
+    flog(`[einvoice] HOOK CAGRILDI - siparis #${order?.id} status=${order?.status} payment=${order?.payment_status} einv=${order?.einvoice_status} email=${order?.billing_email}`);
+    if (String(process.env.EINVOICE_AUTO_SEND).toLowerCase() !== 'true') {
+      flog(`[einvoice] EINVOICE_AUTO_SEND=${process.env.EINVOICE_AUTO_SEND} -> ATLANDI`);
+      return;
+    }
     if (!order) return;
-    // Dedupe: zaten gonderilmis / taslak olarak yuklenmis / onizleme maili gitmis siparislerde tekrar gonderme.
-    // Sadece 'failed' veya hic denenmemis ('pending'/null) durumlarda yeniden dene.
-    const alreadyHandled = ['sent', 'delivered', 'draft', 'preview_sent'];
-    if (order.einvoice_status && alreadyHandled.includes(order.einvoice_status)) return;
+    // Dedupe: zaten gonderilmis / onizleme maili gitmis siparislerde tekrar gonderme.
+    // 'draft' (kontor/gonderim hatasi) ve 'failed' yeniden denenir.
+    const alreadyHandled = ['sent', 'delivered', 'preview_sent'];
+    if (order.einvoice_status && alreadyHandled.includes(order.einvoice_status)) {
+      flog(`[einvoice] ZATEN ${order.einvoice_status} -> ATLANDI`);
+      return;
+    }
 
     // items yüklü değilse yükle
     if (!order.items) {
@@ -68,9 +86,9 @@ async function autoSendInvoiceForOrder(order) {
     });
     const mailInfo = result.mail ? ` mail=${result.mail.status}` : '';
     const errInfo = (einvoiceStatus === 'failed' || einvoiceStatus === 'draft') && result.error ? ` err="${result.error}"` : '';
-    console.log(`[einvoice] Siparis #${order.id} fatura: ${einvoiceStatus} (${result.isEarchive ? 'e-arsiv' : 'e-fatura'})${mailInfo}${errInfo}`);
+    flog(`[einvoice] Siparis #${order.id} fatura: ${einvoiceStatus} (${result.isEarchive ? 'e-arsiv' : 'e-fatura'})${mailInfo}${errInfo}`);
   } catch (err) {
-    console.error(`[einvoice] Otomatik gönderim hatası (sipariş #${order?.id}):`, err.message);
+    flog(`[einvoice] HATA siparis #${order?.id}: ${err.message}\n${err.stack || ''}`);
   }
 }
 

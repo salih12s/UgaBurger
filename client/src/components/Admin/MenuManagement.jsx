@@ -386,11 +386,45 @@ export default function MenuManagement() {
   const handleUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('image', file);
-    try { const res = await api.post('/admin/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }); setForm(f => ({ ...f, image_url: res.data.url })); toast.success('Resim yüklendi'); }
-    catch { toast.error('Yükleme hatası'); }
+    if (!file.type.startsWith('image/')) { toast.error('Lütfen bir resim dosyası seçin'); e.target.value = ''; return; }
+    const loadingId = toast.loading('Resim işleniyor...');
+    try {
+      // Telefon fotoğrafları çok büyük olabildiği için yüklemeden önce
+      // tarayıcıda yeniden boyutlandırıp sıkıştırıyoruz. Böylece sunucu
+      // boyut limitine (8MB) takılmadan her fotoğraf sorunsuz eklenir.
+      const dataUrl = await compressImage(file);
+      setForm(f => ({ ...f, image_url: dataUrl }));
+      toast.success('Resim yüklendi', { id: loadingId });
+    } catch (err) {
+      toast.error('Resim yüklenemedi: ' + (err?.message || 'bilinmeyen hata'), { id: loadingId });
+    } finally {
+      e.target.value = '';
+    }
   };
+
+  // Resmi canvas ile yeniden boyutlandırıp JPEG olarak sıkıştırır, data URL döndürür.
+  const compressImage = (file, maxSize = 1280, quality = 0.82) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Dosya okunamadı'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Geçersiz resim'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSize || height > maxSize) {
+          if (width >= height) { height = Math.round(height * (maxSize / width)); width = maxSize; }
+          else { width = Math.round(width * (maxSize / height)); height = maxSize; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 
   const handleExtraSubmit = async () => {
     if (!extraForm.name || !extraForm.price) { toast.error('İsim ve fiyat zorunlu'); return; }
@@ -450,7 +484,7 @@ export default function MenuManagement() {
                 {products.map(p => (
                   <TableRow key={p.id} hover>
                     <TableCell>
-                      {p.image_url ? <Box component="img" src={getImageUrl(p.image_url)} alt="" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover' }} /> : '🍔'}
+                      {p.image_url ? <Box component="img" src={getImageUrl(p.image_url)} alt="" loading="lazy" decoding="async" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover' }} /> : '🍔'}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{p.name}</TableCell>
                     <TableCell>{p.category?.name}</TableCell>
@@ -576,7 +610,7 @@ export default function MenuManagement() {
             Resim Yükle
             <input type="file" accept="image/*" onChange={handleUpload} hidden />
           </Button>
-          {form.image_url && <Box component="img" src={getImageUrl(form.image_url)} alt="" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, ml: 1.5 }} />}
+          {form.image_url && <Box component="img" src={getImageUrl(form.image_url)} alt="" loading="lazy" decoding="async" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, ml: 1.5 }} />}
           <Box sx={{ mt: 1.5, mb: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             <FormControlLabel control={<Switch name="is_available" checked={form.is_available} onChange={e => setForm(f => ({ ...f, is_available: e.target.checked }))} />} label="Aktif" />
             <FormControlLabel control={<Checkbox checked={form.is_suggested || false} onChange={e => setForm(f => ({ ...f, is_suggested: e.target.checked }))} />} label="Sepette Önerilenlerde Göster" />

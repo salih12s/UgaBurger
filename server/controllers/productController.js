@@ -21,10 +21,28 @@ const productInclude = [
     include: [{
       model: OptionGroupItem,
       as: 'items',
-      include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'price', 'image_url', 'category_id'] }],
+      include: [{
+        model: Product,
+        as: 'product',
+        attributes: ['id', 'name', 'price', 'image_url', 'category_id', 'is_available'],
+      }],
     }],
   },
 ];
+
+// Pasif (is_available=false) ürünlere bağlı opsiyon kalemlerini ve bu yüzden tamamen
+// boşalan opsiyon gruplarını cevaptan çıkartır. Müşteri menüsünde stoğu biten ürün
+// hem ana listeden hem de "ekstra opsiyon" seçeneklerinden gözükmesin.
+function filterInactiveOptionItems(productJson) {
+  if (!productJson || !Array.isArray(productJson.optionGroups)) return productJson;
+  productJson.optionGroups = productJson.optionGroups
+    .map(g => ({
+      ...g,
+      items: (g.items || []).filter(it => !it.product || it.product.is_available !== false),
+    }))
+    .filter(g => g.items && g.items.length > 0);
+  return productJson;
+}
 
 const getProducts = async (req, res) => {
   try {
@@ -39,7 +57,8 @@ const getProducts = async (req, res) => {
         [{ model: OptionGroup, as: 'optionGroups' }, 'sort_order', 'ASC'],
       ],
     });
-    res.json(products);
+    const cleaned = products.map(p => filterInactiveOptionItems(p.toJSON()));
+    res.json(cleaned);
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
   }
@@ -49,7 +68,7 @@ const getProductById = async (req, res) => {
   try {
     const product = await Product.findByPk(req.params.id, { include: productInclude });
     if (!product) return res.status(404).json({ error: 'Ürün bulunamadı' });
-    res.json(product);
+    res.json(filterInactiveOptionItems(product.toJSON()));
   } catch (err) {
     res.status(500).json({ error: 'Sunucu hatası' });
   }

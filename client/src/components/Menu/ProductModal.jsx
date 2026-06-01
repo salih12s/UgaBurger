@@ -88,7 +88,7 @@ export default function ProductModal({ product, onClose }) {
       </IconButton>
 
       {product.image_url ? (
-        <Box component="img" src={getImageUrl(product.image_url)} alt={product.name} sx={{ width: '100%', height: 280, objectFit: 'cover' }} />
+        <Box component="img" src={getImageUrl(product.image_url)} alt={product.name} loading="eager" decoding="async" fetchpriority="high" sx={{ width: '100%', height: 280, objectFit: 'cover' }} />
       ) : (
         <Box sx={{ width: '100%', height: 280, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 64 }}>🍔</Box>
       )}
@@ -158,7 +158,7 @@ export default function ProductModal({ product, onClose }) {
                         <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
                           <Checkbox checked={isSelected} size="small" sx={{ p: 0, color: '#dc2626', '&.Mui-checked': { color: '#dc2626' } }} />
                           {item.product?.image_url
-                            ? <Box component="img" src={getImageUrl(item.product.image_url)} alt="" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover', flexShrink: 0 }} />
+                            ? <Box component="img" src={getImageUrl(item.product.image_url)} alt="" loading="lazy" decoding="async" sx={{ width: 40, height: 40, borderRadius: 1.5, objectFit: 'cover', flexShrink: 0 }} />
                             : <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🍔</Box>
                           }
                           <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.product?.name || 'Ürün'}</Typography>

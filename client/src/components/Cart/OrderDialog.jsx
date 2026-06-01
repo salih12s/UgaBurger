@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -13,8 +13,9 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import LockIcon from '@mui/icons-material/Lock';
-import AddressFormDialog from './AddressFormDialog';
-import BillingAddressDialog from './BillingAddressDialog';
+// Lazy: Leaflet+BillingDialog cok agir, sadece adres/fatura ekleme acilirken yuklensin
+const AddressFormDialog = lazy(() => import('./AddressFormDialog'));
+const BillingAddressDialog = lazy(() => import('./BillingAddressDialog'));
 
 // Haversine mesafe hesaplama (km)
 const haversineDistance = (lat1, lon1, lat2, lon2) => {
@@ -308,24 +309,28 @@ export default function OrderDialog({ onClose, products }) {
   // Adres formu diyaloğu (sipariş ekranından yeni adres ekleme)
   if (showAddressForm) {
     return (
-      <AddressFormDialog
-        open={true}
-        onClose={() => setShowAddressForm(false)}
-        onSave={handleAddressSaved}
-        editAddress={editingAddress !== null ? userAddresses[editingAddress] : null}
-      />
+      <Suspense fallback={null}>
+        <AddressFormDialog
+          open={true}
+          onClose={() => setShowAddressForm(false)}
+          onSave={handleAddressSaved}
+          editAddress={editingAddress !== null ? userAddresses[editingAddress] : null}
+        />
+      </Suspense>
     );
   }
 
   // Fatura adresi formu diyaloğu
   if (showBillingForm) {
     return (
-      <BillingAddressDialog
-        open={true}
-        onClose={() => setShowBillingForm(false)}
-        onSave={(data) => { setBillingAddress(data); setShowBillingForm(false); toast.success('Fatura adresi kaydedildi'); }}
-        editAddress={billingAddress}
-      />
+      <Suspense fallback={null}>
+        <BillingAddressDialog
+          open={true}
+          onClose={() => setShowBillingForm(false)}
+          onSave={(data) => { setBillingAddress(data); setShowBillingForm(false); toast.success('Fatura adresi kaydedildi'); }}
+          editAddress={billingAddress}
+        />
+      </Suspense>
     );
   }
 
@@ -499,7 +504,7 @@ export default function OrderDialog({ onClose, products }) {
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, fontSize: 12 }}>✨ SİZİN İÇİN SEÇTİK</Typography>
                 {suggestions.map(p => (
                   <Stack key={p.id} direction="row" alignItems="center" spacing={1} sx={{ p: 0.8, border: 1, borderColor: '#eee', borderRadius: 2, mb: 0.5 }}>
-                    {p.image_url ? <Box component="img" src={getImageUrl(p.image_url)} alt={p.name} sx={{ width: 32, height: 32, borderRadius: 1.5, objectFit: 'cover' }} /> : <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🍔</Box>}
+                    {p.image_url ? <Box component="img" src={getImageUrl(p.image_url)} alt={p.name} loading="lazy" decoding="async" sx={{ width: 32, height: 32, borderRadius: 1.5, objectFit: 'cover' }} /> : <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🍔</Box>}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', lineHeight: 1.2 }}>{p.name}</Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>{parseFloat(p.price).toFixed(2)} ₺</Typography>
@@ -516,7 +521,7 @@ export default function OrderDialog({ onClose, products }) {
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Sipariş Özeti</Typography>
             {items.map((item, idx) => (
               <Stack key={idx} direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid #f0f0f0' }}>
-                {item.product.image_url ? <Box component="img" src={getImageUrl(item.product.image_url)} alt={item.product.name} sx={{ width: 56, height: 56, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🍔</Box>}
+                {item.product.image_url ? <Box component="img" src={getImageUrl(item.product.image_url)} alt={item.product.name} loading="lazy" decoding="async" sx={{ width: 56, height: 56, borderRadius: 2, objectFit: 'cover' }} /> : <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🍔</Box>}
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.product.name}</Typography>
                   {item.selectedExtras.length > 0 && <Typography variant="caption" sx={{ color: '#8b5cf6' }}>+ {item.selectedExtras.map(e => `${(e.quantity || 1) > 1 ? (e.quantity || 1) + 'x ' : ''}${e.name}`).join(', ')}</Typography>}

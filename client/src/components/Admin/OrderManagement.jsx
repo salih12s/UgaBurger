@@ -129,7 +129,8 @@ export default function OrderManagement() {
   }, []);
 
   const fetchOrders = useCallback(() => {
-    api.get('/admin/orders').then(res => {
+    // Limit 200 -> server tarafinda da limitli, payload kucuk
+    api.get('/admin/orders?limit=200').then(res => {
       const newOrders = res.data;
       const newPendingCount = newOrders.filter(o => o.status === 'pending').length;
       if (prevOrderCount.current !== null && newPendingCount > prevOrderCount.current) {
@@ -147,7 +148,8 @@ export default function OrderManagement() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
+    // 10s -> 15s polling
+    const interval = setInterval(fetchOrders, 15000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 

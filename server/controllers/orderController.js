@@ -73,6 +73,15 @@ const createOrder = async (req, res) => {
       });
     }
 
+    // billing_email gelmediyse kullanicinin kayitli email'ini DB'den al
+    let resolvedBillingEmail = billing_email || null;
+    if (!resolvedBillingEmail && req.user?.id) {
+      try {
+        const u = await User.findByPk(req.user.id, { attributes: ['email'] });
+        if (u?.email) resolvedBillingEmail = u.email;
+      } catch {}
+    }
+
     const order = await Order.create({
       user_id: req.user.id,
       order_type: order_type || 'online',
@@ -97,7 +106,8 @@ const createOrder = async (req, res) => {
       billing_tax_number: billing_tax_number || null,
       billing_tax_office: billing_tax_office || null,
       billing_is_einvoice_payer: !!billing_is_einvoice_payer,
-      billing_email: billing_email || null,
+      // billing_email gelmediyse kullanicinin kayitli email'ini kullan (e-fatura/e-arsiv mail icin gerekli)
+      billing_email: resolvedBillingEmail,
       billing_phone: billing_phone || null,
     }, { transaction: t });
 

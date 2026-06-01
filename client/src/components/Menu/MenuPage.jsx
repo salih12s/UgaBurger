@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/api';
 import ProductCard from './ProductCard';
 import ProductModal from './ProductModal';
-import OrderDialog from '../Cart/OrderDialog';
-import AddressFormDialog from '../Cart/AddressFormDialog';
+// Lazy load: Leaflet (harita) ve OrderDialog ilk yuklemede gerek yok
+// -> initial JS bundle kucuk, /menu sayfasi cok daha hizli acilir
+const OrderDialog = lazy(() => import('../Cart/OrderDialog'));
+const AddressFormDialog = lazy(() => import('../Cart/AddressFormDialog'));
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { Box, Button, Chip, Stack, Typography, Fab, Badge } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 
 export default function MenuPage() {
   // İlk render'da localStorage cache'inden başlat -> menü ve resimler anında görünür, sonra arka planda tazelenir
@@ -31,6 +34,28 @@ export default function MenuPage() {
   const { totalItems, totalAmount } = useCart();
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
+
+  // Mobilde kategori sekmelerinin yana kaydırılabildiğini göstermek için ipucu
+  const tabsRef = useRef(null);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+
+  // Kategoriler yüklendiğinde taşma var mı kontrol et (mobilde kaydırma ipucu)
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const checkOverflow = () => {
+      const overflowing = el.scrollWidth > el.clientWidth + 8;
+      const atStart = el.scrollLeft < 8;
+      setShowSwipeHint(overflowing && atStart);
+    };
+    checkOverflow();
+    el.addEventListener('scroll', checkOverflow, { passive: true });
+    window.addEventListener('resize', checkOverflow);
+    return () => {
+      el.removeEventListener('scroll', checkOverflow);
+      window.removeEventListener('resize', checkOverflow);
+    };
+  }, [categories]);
 
   useEffect(() => {
     api.get('/categories').then(res => {
@@ -113,39 +138,91 @@ export default function MenuPage() {
                 {settings.closed_message || 'Şuanda online sipariş hizmeti verilmemektedir.'}
               </Typography>
             </Stack>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => navigate('/contact')}
-              sx={{
-                borderRadius: 20,
-                whiteSpace: 'nowrap',
-                color: '#fff',
-                borderColor: 'rgba(255,255,255,0.7)',
-                alignSelf: { xs: 'flex-start', sm: 'center' },
-                '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
-              }}
-            >
-              İletişim & Detay ›
-            </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+              {settings.closed_banner_link_url && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  component="a"
+                  href={settings.closed_banner_link_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    borderRadius: 20,
+                    whiteSpace: 'nowrap',
+                    fontWeight: 700,
+                    color: settings.closed_banner_color || '#3b82f6',
+                    bgcolor: '#fff',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    alignSelf: { xs: 'stretch', sm: 'center' },
+                    '&:hover': { bgcolor: '#f1f1f1' },
+                  }}
+                >
+                  {settings.closed_banner_link_text || 'Sipariş Ver ›'}
+                </Button>
+              )}
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => navigate('/contact')}
+                sx={{
+                  borderRadius: 20,
+                  whiteSpace: 'nowrap',
+                  color: '#fff',
+                  borderColor: 'rgba(255,255,255,0.7)',
+                  alignSelf: { xs: 'stretch', sm: 'center' },
+                  '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
+                }}
+              >
+                İletişim & Detay ›
+              </Button>
+            </Stack>
           </Stack>
         </Box>
       )}
 
-      <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, mb: 3, '&::-webkit-scrollbar': { display: 'none' } }}>
-        <Chip label="Tümü" onClick={() => setActiveCategory(null)}
-          variant={activeCategory === null ? 'filled' : 'outlined'}
-          sx={{ fontWeight: 500, ...(activeCategory === null && { bgcolor: '#dc2626', color: '#fff' }) }} />
-        {categories.map(cat => (
-          <Chip key={cat.id} label={cat.name} onClick={() => setActiveCategory(cat.id)}
-            variant={activeCategory === cat.id ? 'filled' : 'outlined'}
-            sx={{ fontWeight: 500, ...(activeCategory === cat.id && { bgcolor: '#dc2626', color: '#fff' }) }} />
-        ))}
-      </Stack>
+      <Box sx={{ position: 'relative', mb: 3 }}>
+        <Stack ref={tabsRef} direction="row" spacing={1} onPointerDown={() => setShowSwipeHint(false)}
+          sx={{ overflowX: 'auto', pb: 1, pr: showSwipeHint ? 4 : 0, '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' }}>
+          <Chip label="Tümü" onClick={() => setActiveCategory(null)}
+            variant={activeCategory === null ? 'filled' : 'outlined'}
+            sx={{ fontWeight: 500, ...(activeCategory === null && { bgcolor: '#dc2626', color: '#fff' }) }} />
+          {categories.map(cat => (
+            <Chip key={cat.id} label={cat.name} onClick={() => setActiveCategory(cat.id)}
+              variant={activeCategory === cat.id ? 'filled' : 'outlined'}
+              sx={{ fontWeight: 500, ...(activeCategory === cat.id && { bgcolor: '#dc2626', color: '#fff' }) }} />
+          ))}
+        </Stack>
+        {/* Mobil kaydırma ipucu: sağda solma + animasyonlu ok (tıklamayı engellemez) */}
+        {showSwipeHint && (
+          <Box sx={{
+            display: { xs: 'flex', md: 'none' },
+            position: 'absolute', top: 0, right: 0, bottom: 8,
+            width: 36,
+            alignItems: 'center', justifyContent: 'flex-end', pr: 0.25,
+            pointerEvents: 'none',
+            background: 'linear-gradient(to right, rgba(255,255,255,0), #fff 70%)',
+          }}>
+            <KeyboardDoubleArrowRightIcon sx={{
+              color: '#dc2626', fontSize: 24,
+              animation: 'swipeHint 1.1s ease-in-out infinite',
+              '@keyframes swipeHint': {
+                '0%, 100%': { transform: 'translateX(0)', opacity: 0.5 },
+                '50%': { transform: 'translateX(4px)', opacity: 1 },
+              },
+            }} />
+          </Box>
+        )}
+      </Box>
+      {showSwipeHint && (
+        <Typography variant="caption" sx={{ display: { xs: 'block', md: 'none' }, textAlign: 'center', color: 'text.secondary', mt: -2, mb: 2 }}>
+          ← Kategorileri görmek için kaydırın →
+        </Typography>
+      )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2.5 }}>
-        {filteredProducts.map(product => (
-          <ProductCard key={product.id} product={product} onClick={() => setSelectedProduct(product)} disabled={!isOnlineActive} />
+        {filteredProducts.map((product, idx) => (
+          <ProductCard key={product.id} product={product} onClick={() => setSelectedProduct(product)} disabled={!isOnlineActive} eager={idx < 6} />
         ))}
       </Box>
 
@@ -167,15 +244,21 @@ export default function MenuPage() {
       )}
 
       {showAddressFirst && (
-        <AddressFormDialog
-          open={true}
-          onClose={() => setShowAddressFirst(false)}
-          onSave={handleAddressSaved}
-          editAddress={null}
-        />
+        <Suspense fallback={null}>
+          <AddressFormDialog
+            open={true}
+            onClose={() => setShowAddressFirst(false)}
+            onSave={handleAddressSaved}
+            editAddress={null}
+          />
+        </Suspense>
       )}
 
-      {showOrder && isOnlineActive && <OrderDialog onClose={() => setShowOrder(false)} products={products} />}
+      {showOrder && isOnlineActive && (
+        <Suspense fallback={null}>
+          <OrderDialog onClose={() => setShowOrder(false)} products={products} />
+        </Suspense>
+      )}
     </Box>
   );
 }

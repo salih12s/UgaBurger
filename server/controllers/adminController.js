@@ -12,6 +12,10 @@ const getAllOrders = async (req, res) => {
     if (req.query.status) where.status = req.query.status;
     if (req.query.order_type) where.order_type = req.query.order_type;
 
+    // Performans: varsayilan olarak son 200 siparis. Eski siparisleri filtrelemek
+    // icin ?limit=500 veya ?from=YYYY-MM-DD parametreleri kullanilabilir.
+    const limit = Math.min(parseInt(req.query.limit, 10) || 200, 1000);
+
     const orders = await Order.findAll({
       where,
       include: [
@@ -20,6 +24,7 @@ const getAllOrders = async (req, res) => {
         { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'image_url'] }] },
       ],
       order: [['created_at', 'DESC']],
+      limit,
     });
     res.json(orders);
   } catch (err) {
@@ -102,11 +107,13 @@ const updateOrderStatus = async (req, res) => {
     await order.save();
 
     // Admin sipariş onayında otomatik e-fatura/e-arşiv:
-    //  - pending → onaylandı (preparing/confirmed/ready/out_for_delivery/delivered) geçişinde
+    //  - SADECE pending → onaylandı (preparing/confirmed/ready/out_for_delivery/delivered) ilk geçişinde
+    //  - sonraki statü değişikliklerinde (örn. ready → out_for_delivery → delivered) TEKRAR tetiklenmez
     //  - online ödeme (paid) ise tetikle
-    //  - hook kendi içinde dedupe yapar (zaten 'sent'/'delivered' ise atlar)
+    //  - hook kendi içinde ayrıca dedupe yapar
     const approvedStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
     if (status && status !== prevStatus
+        && prevStatus === 'pending'
         && approvedStatuses.includes(status)
         && order.payment_status === 'paid') {
       try {
@@ -748,8 +755,93 @@ const deleteOptionGroup = async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Sunucu hatası: ' + err.message }); }
 };
 
+// --- ADMIN PASSWORD RESET ---
+// Admin panelinden tıklandığında: hedef e-posta adresine (varsayılan Ugaburger33@gmail.com)
+// şifre sıfırlama bağlantısı gönderir. Token, giriş yapmış admin kullanıcısına yazılır.
+const sendAdminPasswordReset = async (req, res) => {
+  try {
+    const crypto = require('crypto');
+    const nodemailer = require('nodemailer');
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'Ugaburger33@gmail.com';
+
+    // Giriş yapmış admin kullanıcısı (req.user.id authMiddleware'dan gelir)
+    const adminUser = await User.findByPk(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Yetkisiz işlem' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    adminUser.reset_token = token;
+    adminUser.reset_token_expires = new Date(Date.now() + 60 * 60 * 1000); // 1 saat
+    // Admin'in kayıtlı e-postasını da sabit hedefe eşitle (sıfırlama akışı bu mail üzerinden çalışır)
+    if (!adminUser.email || String(adminUser.email).trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      adminUser.email = ADMIN_EMAIL;
+    }
+    await adminUser.save();
+
+    const frontendUrl = (process.env.FRONTEND_URL || 'https://ugaburger.com').replace(/\/$/, '');
+    const resetUrl = `${frontendUrl}/reset-password/${token}`;
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    await transporter.sendMail({
+      from: `"UGA BURGER" <${process.env.SMTP_USER || 'no-reply@ugaburger.com'}>`,
+      to: ADMIN_EMAIL,
+      subject: 'Admin Şifre Sıfırlama Talebi - UGA BURGER',
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="500" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;max-width:500px;width:100%;box-shadow:0 4px 18px rgba(0,0,0,0.06);">
+  <tr><td style="background:#dc2626;padding:24px;text-align:center;">
+    <span style="font-size:30px;">🍔</span>
+    <h1 style="color:#fff;margin:8px 0 0;font-size:22px;">UGA BURGER</h1>
+  </td></tr>
+  <tr><td style="padding:32px 28px;">
+    <h2 style="color:#222;text-align:center;margin:0 0 12px;">Admin Şifre Sıfırlama</h2>
+    <p style="color:#555;font-size:15px;line-height:1.55;text-align:center;margin:0 0 20px;">Admin paneli üzerinden şifre sıfırlama talebi yapıldı. Yeni şifrenizi belirlemek için aşağıdaki butona tıklayın. Bağlantı <strong>1 saat</strong> boyunca geçerlidir.</p>
+    <div style="margin:28px auto;text-align:center;">
+      <a href="${resetUrl}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:16px;">Şifremi Sıfırla</a>
+    </div>
+    <p style="color:#888;font-size:12px;line-height:1.6;text-align:center;margin:20px 0 0;word-break:break-all;">Buton çalışmazsa bu bağlantıyı tarayıcınıza yapıştırın:<br><a href="${resetUrl}" style="color:#3b82f6;">${resetUrl}</a></p>
+    <p style="color:#888;font-size:12px;line-height:1.5;text-align:center;margin:18px 0 0;">Bu talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>
+  </td></tr>
+  <tr><td style="background:#f9f9f9;padding:14px;text-align:center;">
+    <p style="color:#aaa;font-size:12px;margin:0;">&copy; ${new Date().getFullYear()} UGA BURGER</p>
+  </td></tr>
+</table></td></tr></table></body></html>`,
+      text: `UGA BURGER - Admin Şifre Sıfırlama\n\nYeni şifrenizi belirlemek için bu bağlantıya gidin (1 saat geçerli):\n${resetUrl}`,
+    });
+
+    res.json({ message: 'Şifre sıfırlama bağlantısı gönderildi', email: ADMIN_EMAIL });
+  } catch (err) {
+    res.status(500).json({ error: 'E-posta gönderilemedi: ' + err.message });
+  }
+};
+
+// Hafif endpoint: sadece bekleyen siparis sayisi (rozet/polling icin).
+// Tum siparisleri cekmek yerine COUNT(*) calistirir -> cok daha hizli.
+const getPendingOrdersCount = async (req, res) => {
+  try {
+    const [total, online] = await Promise.all([
+      Order.count({ where: { status: 'pending' } }),
+      Order.count({ where: { status: 'pending', order_type: 'online' } }),
+    ]);
+    res.json({ total, online });
+  } catch (err) {
+    res.status(500).json({ error: 'Sunucu hatasi: ' + err.message });
+  }
+};
+
 module.exports = {
   getAllOrders, updateOrderStatus, createQuickOrder,
+  getPendingOrdersCount,
   getTables, createTable, updateTable, deleteTable,
   getAllProductsAdmin, createProduct, updateProduct, deleteProduct,
   createCategory, updateCategory, deleteCategory,
@@ -760,4 +852,5 @@ module.exports = {
   getSettings, updateSetting,
   getPromoCodes, createPromoCode, updatePromoCode, deletePromoCode,
   getOptionGroups, createOptionGroup, updateOptionGroup, deleteOptionGroup,
+  sendAdminPasswordReset,
 };

@@ -61,6 +61,14 @@ export default function HomePage() {
   const textSizeMap = { small: { xs: 24, sm: 32, md: 38 }, medium: { xs: 30, sm: 40, md: 48 }, large: { xs: 36, sm: 48, md: 60 } };
   const heroTextSize = textSizeMap[settings.hero_text_size] || textSizeMap.medium;
 
+  // Logo ayarları (admin panelinden değiştirilebilir)
+  const logoUrl = settingsLoaded ? getImageUrl(settings.site_logo || '/logo-transparent.png') : null;
+  const logoVisible = (settings.home_logo_visible ?? 'true') !== 'false';
+  const logoSizeMap = { small: { xs: 90, sm: 110, md: 130 }, medium: { xs: 130, sm: 160, md: 190 }, large: { xs: 170, sm: 210, md: 250 } };
+  const logoSize = logoSizeMap[settings.home_logo_size] || logoSizeMap.medium;
+  const logoPosition = settings.home_logo_position || 'above'; // 'above' (başlığın üstünde) | 'top' (sayfa en üst) | 'hidden'
+  const showLogo = logoVisible && logoUrl && logoPosition !== 'hidden';
+
   return (
     <Box sx={{
       position: 'relative', width: '100%', height: '100vh',
@@ -70,7 +78,29 @@ export default function HomePage() {
       backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
       <Box sx={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, rgba(0,0,0,${Math.min(heroOverlay + 0.1, 1).toFixed(2)}) 0%, rgba(0,0,0,${(heroOverlay * 0.3).toFixed(2)}) 50%, rgba(0,0,0,${(heroOverlay * 0.5).toFixed(2)}) 100%)` }} />
+
+      {/* Sayfa en üstünde sabit logo (logo_position='top' ise) */}
+      {showLogo && logoPosition === 'top' && (
+        <Box sx={{ position: 'absolute', top: { xs: 16, sm: 24 }, left: 0, right: 0, zIndex: 3, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+          <Box component="img" src={logoUrl} alt="Logo" loading="eager" decoding="async"
+            sx={{ width: logoSize, height: 'auto', maxWidth: '70vw', filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.6))' }} />
+        </Box>
+      )}
+
       <Box sx={{ position: 'relative', zIndex: 2, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Başlığın üstünde logo (varsayılan) */}
+        {showLogo && logoPosition === 'above' && (
+          <Box component="img" src={logoUrl} alt="Logo" loading="eager" decoding="async"
+            sx={{
+              width: logoSize, height: 'auto', maxWidth: '80vw', mb: { xs: 2, sm: 3 },
+              filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.7))',
+              animation: 'logoIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              '@keyframes logoIn': {
+                '0%': { opacity: 0, transform: 'translateY(-20px) scale(0.85)' },
+                '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
+              },
+            }} />
+        )}
         <Typography variant="h1" sx={{
           fontSize: heroTextSize, fontWeight: 900, color: heroTextColor,
           textShadow: '2px 4px 24px rgba(0,0,0,0.7)', mb: 4, fontStyle: 'italic',

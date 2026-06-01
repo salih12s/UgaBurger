@@ -40,7 +40,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Forgot password states
+  // Forgot password (e-posta linki gönder)
   const [fpOpen, setFpOpen] = useState(false);
   const [fpEmail, setFpEmail] = useState('');
   const [fpLoading, setFpLoading] = useState(false);
@@ -61,20 +61,22 @@ export default function LoginPage() {
     }
   };
 
-  const handleFpReset = async () => {
+  const handleFpSendLink = async () => {
     if (!fpEmail) { toast.error('E-posta adresi gerekli'); return; }
     setFpLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email: fpEmail });
+      await api.post('/auth/forgot-password', { email: fpEmail.trim() });
+      toast.success('Şifre sıfırlama bağlantısı e-postanıza gönderildi');
       setFpSent(true);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Hata');
+      toast.error(err.response?.data?.error || 'E-posta gönderilemedi');
     } finally { setFpLoading(false); }
   };
 
   const closeFp = () => {
     setFpOpen(false);
-    setFpEmail(''); setFpSent(false);
+    setFpEmail('');
+    setFpSent(false);
   };
 
   return (
@@ -114,28 +116,33 @@ export default function LoginPage() {
       <Dialog open={fpOpen} onClose={closeFp} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogContent sx={{ p: 4 }}>
           <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5, textAlign: 'center' }}>Şifremi Unuttum</Typography>
-          {fpSent ? (
+
+          {!fpSent ? (
             <>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2, mt: 2, textAlign: 'center' }}>
-                Şifre sıfırlama linki <strong>{fpEmail}</strong> adresine gönderildi. Lütfen e-postanızı kontrol ediniz.
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, mt: 1, textAlign: 'center' }}>
+                Kayıtlı e-posta adresinizi giriniz. Şifre sıfırlama bağlantısı e-postanıza gönderilecek.
+              </Typography>
+              <TextField fullWidth size="small" label="E-posta Adresi" type="email" autoFocus
+                value={fpEmail} onChange={e => setFpEmail(e.target.value)} sx={{ mb: 2 }} />
+              <Button fullWidth variant="contained" onClick={handleFpSendLink} disabled={fpLoading}
+                sx={{ py: 1.3, fontWeight: 700, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}>
+                {fpLoading ? 'Gönderiliyor...' : 'Sıfırlama Bağlantısı Gönder'}
+              </Button>
+              <Button fullWidth variant="text" onClick={closeFp} sx={{ mt: 1.5, color: '#888', fontSize: 13 }}>İptal</Button>
+            </>
+          ) : (
+            <>
+              <Typography sx={{ fontSize: 56, textAlign: 'center', mt: 1 }}>📧</Typography>
+              <Typography variant="body1" sx={{ mb: 1, mt: 1, textAlign: 'center', fontWeight: 700 }}>
+                Bağlantı gönderildi
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+                <strong>{fpEmail}</strong> adresine gelen e-postadaki bağlantıya tıklayarak yeni şifrenizi belirleyebilirsiniz. Bağlantı 1 saat boyunca geçerlidir.
               </Typography>
               <Button fullWidth variant="contained" onClick={closeFp}
                 sx={{ py: 1.3, fontWeight: 700, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}>
                 Tamam
               </Button>
-            </>
-          ) : (
-            <>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-                Kayıtlı e-posta adresinizi giriniz. Şifre sıfırlama linki göndereceğiz.
-              </Typography>
-              <TextField fullWidth size="small" label="E-posta Adresi" type="email"
-                value={fpEmail} onChange={e => setFpEmail(e.target.value)} sx={{ mb: 2 }} />
-              <Button fullWidth variant="contained" onClick={handleFpReset} disabled={fpLoading}
-                sx={{ py: 1.3, fontWeight: 700, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}>
-                {fpLoading ? 'Gönderiliyor...' : 'Sıfırlama Linki Gönder'}
-              </Button>
-              <Button fullWidth variant="text" onClick={closeFp} sx={{ mt: 1.5, color: '#888', fontSize: 13 }}>İptal</Button>
             </>
           )}
         </DialogContent>

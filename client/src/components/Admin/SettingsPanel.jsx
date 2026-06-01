@@ -23,6 +23,54 @@ const Section = ({ icon, title, children, defaultExpanded }) => (
   </Accordion>
 );
 
+// Admin şifresi değiştirme: tek tıkla Ugaburger33@gmail.com adresine sıfırlama linki gönderir.
+function AdminPasswordChange() {
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sentTo, setSentTo] = useState('');
+
+  const sendLink = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post('/admin/send-password-reset');
+      setSentTo(data?.email || 'Ugaburger33@gmail.com');
+      toast.success('Şifre sıfırlama bağlantısı gönderildi');
+      setSent(true);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Bağlantı gönderilemedi');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 520 }}>
+      <Box sx={{ p: 2, mb: 2, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 2 }}>
+        <Typography variant="caption" sx={{ color: '#991b1b', fontWeight: 700, display: 'block', mb: 0.5 }}>
+          ⚠️ Güvenlik
+        </Typography>
+        <Typography variant="caption" sx={{ color: '#7f1d1d' }}>
+          Aşağıdaki butona bastığınızda <strong>Ugaburger33@gmail.com</strong> adresine şifre sıfırlama bağlantısı gönderilir. Maildeki bağlantıya tıklayarak yeni admin şifresini belirleyebilirsiniz. Bağlantı 1 saat boyunca geçerlidir.
+        </Typography>
+      </Box>
+
+      {!sent ? (
+        <Button fullWidth variant="contained" disabled={busy} onClick={sendLink}
+          sx={{ py: 1.4, fontWeight: 700, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}>
+          {busy ? 'Gönderiliyor...' : '📧 Şifre Sıfırlama Bağlantısı Gönder'}
+        </Button>
+      ) : (
+        <Box sx={{ textAlign: 'center', py: 2 }}>
+          <Typography sx={{ fontSize: 56 }}>📧</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#16a34a', mb: 1 }}>Bağlantı gönderildi</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <strong>{sentTo}</strong> adresine gelen e-postadaki bağlantıya tıklayarak yeni şifrenizi belirleyin.
+          </Typography>
+          <Button variant="outlined" onClick={() => setSent(false)}>Tekrar Gönder</Button>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 export default function SettingsPanel() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(false);
@@ -122,11 +170,17 @@ export default function SettingsPanel() {
       ['closed_message', s('closed_message','Şuanda online sipariş hizmeti verilmemektedir.')],
       ['closed_banner_color', s('closed_banner_color','#427cf0')],
       ['closed_banner_icon', s('closed_banner_icon','❤️')],
+      ['closed_banner_link_url', s('closed_banner_link_url','')],
+      ['closed_banner_link_text', s('closed_banner_link_text','')],
       ['hero_title', s('hero_title','Taş Devrinden Gelen Lezzet')],
       ['hero_image', s('hero_image','')],
       ['hero_overlay', s('hero_overlay','60')],
       ['hero_text_color', s('hero_text_color','#FFFFFF')],
       ['hero_text_size', s('hero_text_size','medium')],
+      ['site_logo', s('site_logo','')],
+      ['home_logo_visible', s('home_logo_visible','true')],
+      ['home_logo_size', s('home_logo_size','medium')],
+      ['home_logo_position', s('home_logo_position','above')],
       ['receipt_title', s('receipt_title','UGA BURGER')],
       ['receipt_footer', s('receipt_footer','Afiyet Olsun!')],
       ['receipt_font_size', s('receipt_font_size','medium')],
@@ -355,6 +409,19 @@ export default function SettingsPanel() {
             <TextField fullWidth size="small" value={s('closed_banner_icon', '❤️')} onChange={e => upd('closed_banner_icon', e.target.value)} />
           </Box>
         </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 2, mt: 2 }}>
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Yönlendirme Linki (örn. YemekSepeti)</Typography>
+            <TextField fullWidth size="small" placeholder="https://www.yemeksepeti.com/restaurant/..." value={s('closed_banner_link_url', '')} onChange={e => upd('closed_banner_link_url', e.target.value)} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Doldurulursa kapanış bannerında tıklanabilir bir buton görünür.
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Buton Yazısı</Typography>
+            <TextField fullWidth size="small" placeholder="YemekSepeti'nden Sipariş Ver" value={s('closed_banner_link_text', '')} onChange={e => upd('closed_banner_link_text', e.target.value)} />
+          </Box>
+        </Box>
       </Section>
 
       {/* 3. Açılış Sayfası Tasarımı */}
@@ -363,6 +430,65 @@ export default function SettingsPanel() {
           <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Açılış Başlığı</Typography>
           <TextField fullWidth size="small" value={s('hero_title', 'Taş Devrinden Gelen Lezzet')} onChange={e => upd('hero_title', e.target.value)} sx={{ mb: 2 }} />
         </Box>
+
+        {/* LOGO */}
+        <Box sx={{ p: 2, mb: 2, bgcolor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#c2410c', mb: 1.5 }}>🍔 Site Logosu (Anasayfa)</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, alignItems: 'center' }}>
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Logo Dosyası (PNG önerilir, arka planı şeffaf)</Typography>
+              <Button variant="outlined" component="label" size="small" sx={{ mr: 1 }}>Logo Yükle
+                <input type="file" hidden accept="image/*" onChange={async e => {
+                  const file = e.target.files[0]; if (!file) return;
+                  const fd = new FormData(); fd.append('image', file);
+                  try {
+                    const res = await api.post('/admin/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    upd('site_logo', res.data.url);
+                    toast.success('Logo yüklendi');
+                  } catch (err) {
+                    toast.error(err?.response?.data?.error || 'Yükleme hatası');
+                  }
+                }} />
+              </Button>
+              {s('site_logo') && (
+                <Button size="small" color="error" onClick={() => upd('site_logo', '')} sx={{ mr: 1 }}>Kaldır</Button>
+              )}
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {s('site_logo') ? 'Mevcut: ' + s('site_logo').split('/').pop() : 'Varsayılan: /logo-transparent.png'}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: '#1a0a0a', borderRadius: 2, p: 2, minHeight: 120 }}>
+              <Box component="img" src={s('site_logo') || '/logo-transparent.png'} alt="Logo Önizleme"
+                sx={{ maxHeight: 100, maxWidth: '100%', objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }} />
+            </Box>
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2, mt: 2 }}>
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Logo Göster</Typography>
+              <Select fullWidth size="small" value={s('home_logo_visible','true')} onChange={e => upd('home_logo_visible', e.target.value)}>
+                <MenuItem value="true">Açık</MenuItem>
+                <MenuItem value="false">Kapalı</MenuItem>
+              </Select>
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Logo Boyutu</Typography>
+              <Select fullWidth size="small" value={s('home_logo_size','medium')} onChange={e => upd('home_logo_size', e.target.value)}>
+                <MenuItem value="small">Küçük</MenuItem>
+                <MenuItem value="medium">Orta</MenuItem>
+                <MenuItem value="large">Büyük</MenuItem>
+              </Select>
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Logo Konumu</Typography>
+              <Select fullWidth size="small" value={s('home_logo_position','above')} onChange={e => upd('home_logo_position', e.target.value)}>
+                <MenuItem value="above">Başlığın Üstünde (Ortada)</MenuItem>
+                <MenuItem value="top">Sayfanın En Üstünde</MenuItem>
+                <MenuItem value="hidden">Gizle</MenuItem>
+              </Select>
+            </Box>
+          </Box>
+        </Box>
+
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>Arka Plan Resmi</Typography>
@@ -648,6 +774,11 @@ export default function SettingsPanel() {
             </TableBody>
           </MuiTable>
         )}
+      </Section>
+
+      {/* Admin Şifre Değiştir (E-posta linki) */}
+      <Section icon="🔐" title="Admin Şifresini Değiştir (E-posta Bağlantılı)">
+        <AdminPasswordChange currentEmail={s('contact_email', 'Ugaburger33@gmail.com')} />
       </Section>
 
       {/* 10. KVKK & Hukuki Metinler */}

@@ -6,6 +6,9 @@ export function getImageUrl(path) {
   if (!path) return '';
   // data: (base64), http(s):, blob: URL'lerini olduğu gibi döndür
   if (path.startsWith('data:') || path.startsWith('http') || path.startsWith('blob:')) return path;
+  // Resimler artik public_html altindaki sembolik link'lerden Apache tarafindan
+  // direkt servis ediliyor (Node'u bypass eder, cok daha hizli).
+  // /uploads ve /images path'leri public_html'e baglandi.
   return `${API_URL}${path}`;
 }
 

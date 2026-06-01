@@ -26,7 +26,16 @@ const Order = sequelize.define('Order', {
   cash_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: true, defaultValue: null },
   total_amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   order_note: { type: DataTypes.TEXT, defaultValue: '' },
-  card_info: { type: DataTypes.JSON, defaultValue: null },
+  card_info: {
+    type: DataTypes.JSON,
+    defaultValue: null,
+    get() {
+      const v = this.getDataValue('card_info');
+      if (v == null) return null;
+      if (typeof v === 'object') return v;
+      try { return JSON.parse(v); } catch { return null; }
+    },
+  },
   customer_name: { type: DataTypes.STRING(100), allowNull: true, defaultValue: null },
   customer_phone: { type: DataTypes.STRING(20), allowNull: true, defaultValue: null },
   promo_code: { type: DataTypes.STRING(50), allowNull: true, defaultValue: null },
@@ -39,7 +48,17 @@ const Order = sequelize.define('Order', {
     defaultValue: 'bireysel',
   },
   billing_same_as_delivery: { type: DataTypes.BOOLEAN, defaultValue: true },
-  billing_address: { type: DataTypes.JSON, allowNull: true, defaultValue: null },
+  billing_address: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: null,
+    get() {
+      const v = this.getDataValue('billing_address');
+      if (v == null) return null;
+      if (typeof v === 'object') return v;
+      try { return JSON.parse(v); } catch { return null; }
+    },
+  },
   // Bireysel
   billing_tckn: { type: DataTypes.STRING(11), allowNull: true, defaultValue: null },
   billing_first_name: { type: DataTypes.STRING(100), allowNull: true, defaultValue: null },

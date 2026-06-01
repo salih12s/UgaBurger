@@ -7,6 +7,7 @@ echo # Environment
 echo NODE_ENV=development
 echo.
 echo # Database Configuration - Local PostgreSQL
+echo DB_DIALECT=postgres
 echo DB_HOST=localhost
 echo DB_PORT=5432
 echo DB_NAME=UgaBurger

@@ -52,10 +52,10 @@ export default function AdminLayout() {
   useEffect(() => {
     const fetchPending = async () => {
       try {
-        const res = await api.get('/admin/orders');
-        const pendingList = res.data.filter(o => o.status === 'pending');
-        const count = pendingList.length;
-        const onlineCount = pendingList.filter(o => o.order_type === 'online').length;
+        // Hafif endpoint: sadece COUNT(*) doner, tum siparis listesini cekmez
+        const res = await api.get('/admin/orders/pending-count');
+        const count = res.data?.total || 0;
+        const onlineCount = res.data?.online || 0;
         pendingRef.current = count;
         if (activeTab === 'orders') seenRef.current = count;
         setPendingCount(count);
@@ -63,7 +63,8 @@ export default function AdminLayout() {
       } catch { /* sessiz geç */ }
     };
     fetchPending();
-    const interval = setInterval(fetchPending, 10000);
+    // 10s -> 15s: server yukunu yariya indirir, bildirim hala hizli gelir
+    const interval = setInterval(fetchPending, 15000);
     return () => clearInterval(interval);
   }, [activeTab]);
 
