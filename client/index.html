@@ -5,19 +5,45 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1a0a0a" />
-    <meta name="description" content="UGA Burger - Online sipariş, lezzetli burgerler ve menü." />
+    <meta
+      name="description"
+      content="UGA Burger'ın güncel menüsünü keşfedin; burger, wrap ve özel lezzetleri inceleyin, sipariş ve mağaza bilgilerine kolayca ulaşın."
+    />
+    <meta name="application-name" content="UGA Burger" />
+    <meta name="author" content="UGA Burger" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://ugaburger.com/" />
 
-    <!-- Performans: kritik kaynakları öne al (logo artik 22KB) -->
+    <meta property="og:type" content="restaurant" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta property="og:site_name" content="UGA Burger" />
+    <meta property="og:title" content="UGA Burger | Taş Devrinden Gelen Lezzet" />
+    <meta
+      property="og:description"
+      content="UGA Burger'ın güncel menüsünü, özel lezzetlerini ve mağaza bilgilerini keşfedin."
+    />
+    <meta property="og:url" content="https://ugaburger.com/" />
+    <meta property="og:image" content="https://ugaburger.com/logo.png" />
+    <meta property="og:image:alt" content="UGA Burger logosu" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="UGA Burger | Taş Devrinden Gelen Lezzet" />
+    <meta
+      name="twitter:description"
+      content="UGA Burger'ın güncel menüsünü, özel lezzetlerini ve mağaza bilgilerini keşfedin."
+    />
+    <meta name="twitter:image" content="https://ugaburger.com/logo.png" />
+
+    <!-- Kritik marka görselini ilk boyama için önceden yükle. -->
     <link rel="preload" as="image" href="/logo-transparent.png" fetchpriority="high" type="image/png" />
 
-    <!-- Google Fonts: preconnect + DAHA AZ font ag\u0131rl\u0131\u011f\u0131 (CLS azaltir) -->
+    <!-- Font bağlantılarını önceden kur ve CSS'i ilk boyamayı engellemeden yükle. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" media="print" onload="this.media='all'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" /></noscript>
 
-    <!-- Render-blocking değil: ilk paint öncesi siyah zemin (FOUC önler) -->
     <style>
       html, body { margin: 0; padding: 0; background: #1a0a0a; color: #fff; }
       #root { min-height: 100vh; }
@@ -25,7 +51,30 @@
       .__app_loader img { width: 140px; height: auto; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.6)); animation: pulse 1.4s ease-in-out infinite; }
       @keyframes pulse { 0%,100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
     </style>
-    <title>UGA Burger</title>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        "name": "UGA Burger",
+        "url": "https://ugaburger.com/",
+        "logo": "https://ugaburger.com/logo.png",
+        "image": "https://ugaburger.com/logo.png",
+        "telephone": "+90 530 125 70 88",
+        "email": "bilgi@ugaburger.com",
+        "servesCuisine": ["Burger", "Fast Food"],
+        "priceRange": "₺₺",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "İnönü Mah. 1405. Sk.",
+          "addressLocality": "Yenişehir",
+          "addressRegion": "Mersin",
+          "addressCountry": "TR"
+        },
+        "sameAs": ["https://www.yemeksepeti.com/restaurant/cebp/uga-burger-cebp"]
+      }
+    </script>
+    <title>UGA Burger | Online Menü ve Sipariş</title>
   </head>
   <body>
     <div id="root">

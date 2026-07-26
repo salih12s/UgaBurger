@@ -4,3 +4,10 @@ server/uploads/*
 !server/uploads/.gitkeep
 dist/
 build/
+*.bak
+/dist.zip
+/DEPLOY-PACKAGE.zip
+/DEPLOY-PACKAGE/
+/client/dist.zip
+/server/preview.pdf
+/server/preview-sample.html

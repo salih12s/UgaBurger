@@ -1,7 +1,7 @@
 {
   "name": "ugaburger-server",
   "version": "1.0.0",
-  "description": "Uga Burger Backend API",
+  "description": "UGA Burger sipariş ve restoran operasyon API'si",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1,7 +1,7 @@
 {
   "name": "ugaburger",
   "version": "1.0.0",
-  "description": "Uga Burger Online Sipariş Sistemi",
+  "description": "UGA Burger online sipariş, restoran operasyonu ve yönetim platformu",
   "main": "electron/main.js",
   "scripts": {
     "start": "cd server && node server.js",
