@@ -2,6 +2,14 @@
   "name": "ugaburger",
   "version": "1.0.0",
   "description": "UGA Burger online sipariş, restoran operasyonu ve yönetim platformu",
+  "homepage": "https://ugaburger.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/salih12s/UgaBurger.git"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "main": "electron/main.js",
   "scripts": {
     "start": "cd server && node server.js",

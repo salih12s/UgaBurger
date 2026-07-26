@@ -1,7 +1,9 @@
+# Sunucu derleme ayarları
 [build]
 builder = "nixpacks"
 buildCommand = "cd server && npm install"
 
+# Üretim çalıştırma ve yeniden başlatma politikası
 [deploy]
 startCommand = "cd server && node server.js"
 restartPolicyType = "ON_FAILURE"

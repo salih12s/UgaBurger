@@ -2,6 +2,11 @@
   "name": "client",
   "private": true,
   "version": "0.0.0",
+  "description": "UGA Burger müşteri deneyimi ve restoran yönetim arayüzü",
+  "homepage": "https://ugaburger.com",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

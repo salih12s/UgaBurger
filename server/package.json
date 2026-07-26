@@ -2,6 +2,10 @@
   "name": "ugaburger-server",
   "version": "1.0.0",
   "description": "UGA Burger sipariş ve restoran operasyon API'si",
+  "homepage": "https://ugaburger.com",
+  "engines": {
+    "node": ">=18"
+  },
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

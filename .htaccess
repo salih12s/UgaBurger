@@ -1,3 +1,4 @@
+# UGA Burger web yönlendirme kuralları
 RewriteEngine On
 
 # API isteklerini Node.js backend'e yönlendir (Plesk proxy üzerinden)

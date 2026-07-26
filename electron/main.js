@@ -5,7 +5,7 @@ let mainWindow;
 
 // --dev flag varsa local, yoksa canlı sunucuya bağlan
 const isDev = process.argv.includes('--dev');
-const PRODUCTION_URL = 'https://ugaburger-production.up.railway.app';
+const PRODUCTION_URL = 'https://ugaburger.com/admin';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -22,11 +22,11 @@ function createWindow() {
   });
 
   if (isDev) {
-    // Development: Vite dev server (local)
+    // Geliştirme ortamı: yerel Vite sunucusu
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // Production: Canlı sunucuya bağlan
+    // Üretim ortamı: canlı yönetim paneli
     mainWindow.loadURL(PRODUCTION_URL);
   }
 
@@ -35,7 +35,7 @@ function createWindow() {
   });
 }
 
-// ====== SILENT PRINT (Popup'sız yazdırma) ======
+// ====== SESSİZ YAZDIRMA (Pencere açmadan çıktı) ======
 ipcMain.handle('silent-print', async (event, html) => {
   return new Promise((resolve, reject) => {
     // Gizli bir pencere oluştur (fiş HTML'ini render etmek için)
