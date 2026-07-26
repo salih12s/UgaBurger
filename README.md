@@ -175,7 +175,7 @@ Müşterinin gördüğü içerik, mağaza durumu ve operasyon kuralları yöneti
 ## Proje haritası
 
 ```text
-MusattiBurger/
+UgaBurger/
 ├── client/
 │   ├── public/                 # Marka varlıkları ve bildirim sesi
 │   └── src/
