@@ -24,6 +24,25 @@
 
 ![UGA Burger ana sayfa](./docs/screenshots/home-desktop.png)
 
+
+<!-- english-overview:start -->
+## English Overview
+
+UGA Burger is a production restaurant ordering and operations platform covering a mobile-first menu, configurable products, cart and address flows, online and table orders, payments, promotions, reporting, integrations, and Electron-based thermal receipt printing.
+
+### My Contribution
+
+I built the customer experience, administration panel, Express API, Sequelize data layer, order workflows, third-party integrations, and Electron POS bridge around a shared operational model.
+
+### Engineering Challenges
+
+- Keeping online, telephone, and table orders consistent within one order lifecycle
+- Sharing the same rules across the customer website, administration panel, and desktop POS
+- Supporting payment, promotion, delivery-zone, invoicing, and receipt-printing workflows
+- Maintaining responsive performance across large menus and administration screens
+- Abstracting the data layer for MySQL/MariaDB and PostgreSQL environments
+<!-- english-overview:end -->
+
 ## Ürün
 
 UGA Burger, müşterinin menüyü keşfetmesinden siparişini tamamlamasına; restoran ekibinin siparişi karşılamasından satışları raporlamasına kadar tüm süreci kapsayan gerçek kullanım odaklı bir restoran otomasyonudur.
